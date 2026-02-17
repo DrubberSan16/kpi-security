@@ -1,6 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { RolesModule } from './roles/roles.module';
+import { UsersModule } from './users/users.module';
+import { MenusModule } from './menus/menus.module';
+import { MenuRolesModule } from './menu-roles/menu-roles.module';
+import { MenuUsersModule } from './menu-users/menu-users.module';
+import { LogTransactsModule } from './log-transacts/log-transacts.module';
+import { ENTITIES } from './database/entities';
 
 @Module({
   imports: [
@@ -20,16 +27,22 @@ import { TypeOrmModule } from '@nestjs/typeorm';
           username: config.get('DB_USER'),
           password: config.get('DB_PASS'),
           database: config.get('DB_NAME'),
-
-          autoLoadEntities: true,
+          schema: 'kpi_security',
+          entities: ENTITIES,
+          autoLoadEntities: false,
           synchronize: false, // recomendado en server
           logging: false,
-
           // Para Postgres remoto (RDS/managed), activa si aplica:
           ssl: sslEnabled ? { rejectUnauthorized: false } : false,
         };
       },
     }),
+    RolesModule,
+    UsersModule,
+    MenusModule,
+    MenuRolesModule,
+    MenuUsersModule,
+    LogTransactsModule,
   ],
 })
 export class AppModule {}
