@@ -104,10 +104,12 @@ export class UsersService {
    * - opcional: guarda token en token_active
    */
   async login(dto: LoginDto) {
-    const user = await this.userRepo.findOne({
-      where: { nameUser: dto.nameUser },
-      relations: ['role'],
-    });
+    const user = await this.userRepo
+    .createQueryBuilder('user')
+    .addSelect('user.passUser') // ✅ trae el hash aunque select:false
+    .leftJoinAndSelect('user.role', 'role')
+    .where('user.nameUser = :nameUser', { nameUser: dto.nameUser })
+    .getOne();
 
     if (!user || user.isDeleted) {
       throw new UnauthorizedException('Credenciales inválidas');

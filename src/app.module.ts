@@ -8,6 +8,10 @@ import { MenuRolesModule } from './menu-roles/menu-roles.module';
 import { MenuUsersModule } from './menu-users/menu-users.module';
 import { LogTransactsModule } from './log-transacts/log-transacts.module';
 import { ENTITIES } from './database/entities';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { AuthModule } from './auth/auth.module';
+
 
 @Module({
   imports: [
@@ -34,6 +38,9 @@ import { ENTITIES } from './database/entities';
           logging: false,
           // Para Postgres remoto (RDS/managed), activa si aplica:
           ssl: sslEnabled ? { rejectUnauthorized: false } : false,
+          extra: {
+            options: '-c timezone=UTC'
+          }
         };
       },
     }),
@@ -43,6 +50,13 @@ import { ENTITIES } from './database/entities';
     MenuRolesModule,
     MenuUsersModule,
     LogTransactsModule,
+    AuthModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
   ],
 })
 export class AppModule {}

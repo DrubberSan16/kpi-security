@@ -2,7 +2,10 @@ import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/commo
 import { LogTransactsService } from './log-transacts.service';
 import { CreateLogTransactDto } from './dto/create-log-transact.dto';
 import { UpdateLogTransactDto } from './dto/update-log-transact.dto';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Log Transacts')
+@ApiBearerAuth('jwt')
 @Controller('log-transacts')
 export class LogTransactsController {
   constructor(private readonly logTransactsService: LogTransactsService) {}

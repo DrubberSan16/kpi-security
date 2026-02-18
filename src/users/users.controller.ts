@@ -8,15 +8,17 @@ import {
   Delete,
   Query,
 } from '@nestjs/common';
-import { ApiTags, ApiQuery, ApiOkResponse, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiQuery, ApiOkResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
+import { Public } from 'src/auth/public.decorator';
 
 @ApiTags('Users')
+@ApiBearerAuth('jwt')
 @Controller('users')
 export class UsersController {
   constructor(private readonly service: UsersService) {}
@@ -49,6 +51,7 @@ export class UsersController {
   }
 
   // ✅ LOGIN
+  @Public()
   @Post('login')
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({ type: LoginResponseDto })

@@ -2,12 +2,15 @@ import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/commo
 import { MenuUsersService } from './menu-users.service';
 import { CreateMenuUserDto } from './dto/create-menu-user.dto';
 import { UpdateMenuUserDto } from './dto/update-menu-user.dto';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
+@ApiBearerAuth('jwt')
+@ApiTags('Menu Users')
 @Controller('menu-users')
 export class MenuUsersController {
   constructor(private readonly menuUsersService: MenuUsersService) {}
 
-  @Post()
+  @Post()  
   create(@Body() createMenuUserDto: CreateMenuUserDto) {
     return this.menuUsersService.create(createMenuUserDto);
   }

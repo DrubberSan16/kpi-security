@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
+import { TimezoneInterceptor } from './common/interceptors/timezone.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -17,7 +18,17 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle(globalPrefix || 'API')
     .setDescription('API Documentation')
-    .setVersion('1.0.0')
+    .setVersion('1.0.0')      
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'Authorization',
+        in: 'header',
+      },
+      'jwt', // ✅ nombre del security scheme
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
@@ -25,6 +36,7 @@ async function bootstrap() {
   // ✅ Swagger SIEMPRE en /<prefix>/docs
   const swaggerPath = globalPrefix ? `${globalPrefix}/docs` : 'docs';
   SwaggerModule.setup(swaggerPath, app, document);
+  app.useGlobalInterceptors(new TimezoneInterceptor());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   await app.listen(port, '127.0.0.1');
 }
