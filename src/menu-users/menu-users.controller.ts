@@ -1,37 +1,49 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
+
 import { MenuUsersService } from './menu-users.service';
 import { CreateMenuUserDto } from './dto/create-menu-user.dto';
 import { UpdateMenuUserDto } from './dto/update-menu-user.dto';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('MenuUsers')
 @ApiBearerAuth('jwt')
-@ApiTags('Menu Users')
 @Controller('menu-users')
 export class MenuUsersController {
-  constructor(private readonly menuUsersService: MenuUsersService) {}
-
-  @Post()  
-  create(@Body() createMenuUserDto: CreateMenuUserDto) {
-    return this.menuUsersService.create(createMenuUserDto);
-  }
+  constructor(private readonly service: MenuUsersService) {}
 
   @Get()
-  findAll() {
-    return this.menuUsersService.findAll();
+  @ApiQuery({ name: 'includeDeleted', required: false, type: Boolean })
+  findAll(@Query('includeDeleted') includeDeleted?: string) {
+    return this.service.findAll(includeDeleted === 'true');
+  }
+
+  @Get('by-user/:userId')
+  @ApiQuery({ name: 'includeDeleted', required: false, type: Boolean })
+  findByUser(
+    @Param('userId') userId: string,
+    @Query('includeDeleted') includeDeleted?: string,
+  ) {
+    return this.service.findByUser(userId, includeDeleted === 'true');
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.menuUsersService.findOne(+id);
+    return this.service.findOne(id);
+  }
+
+  @Post()
+  create(@Body() dto: CreateMenuUserDto) {
+    return this.service.create(dto);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateMenuUserDto: UpdateMenuUserDto) {
-    return this.menuUsersService.update(+id, updateMenuUserDto);
+  update(@Param('id') id: string, @Body() dto: UpdateMenuUserDto) {
+    return this.service.update(id, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.menuUsersService.remove(+id);
+  @ApiQuery({ name: 'deletedBy', required: false, type: String })
+  remove(@Param('id') id: string, @Query('deletedBy') deletedBy?: string) {
+    return this.service.remove(id, deletedBy);
   }
 }
