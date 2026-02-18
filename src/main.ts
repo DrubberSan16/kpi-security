@@ -18,7 +18,7 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle(globalPrefix || 'API')
     .setDescription('API Documentation')
-    .setVersion('1.0.0')      
+    .setVersion('1.0.0')
     .addBearerAuth(
       {
         type: 'http',
@@ -36,6 +36,13 @@ async function bootstrap() {
   // ✅ Swagger SIEMPRE en /<prefix>/docs
   const swaggerPath = globalPrefix ? `${globalPrefix}/docs` : 'docs';
   SwaggerModule.setup(swaggerPath, app, document);
+  app.getHttpAdapter().get(
+    globalPrefix ? `/${globalPrefix}/docs-json` : '/docs-json',
+    (_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.send(document);
+    },
+  );
   app.useGlobalInterceptors(new TimezoneInterceptor());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   await app.listen(port, '127.0.0.1');
