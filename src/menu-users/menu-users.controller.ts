@@ -26,6 +26,13 @@ export class MenuUsersController {
     return this.service.findByUser(userId, includeDeleted === 'true');
   }
 
+  @Get('tree/by-user/:userId')  
+  async findTreeByUser(
+    @Param('userId') userId: string    
+  ) {
+    return await this.service.getMenuTreeByUser(userId);    
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);

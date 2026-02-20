@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { buildMenuTree, orderByMenuPosition } from '../utility/menu-tree.util';
 
 import { TbMenuRole } from '../database/entities/tb-menu-role.entity';
 import { TbRole } from '../database/entities/tb-role.entity';
@@ -20,7 +21,7 @@ export class MenuRolesService {
 
     @InjectRepository(TbMenu)
     private readonly menuRepo: Repository<TbMenu>,
-  ) {}
+  ) { }
 
   async findAll(includeDeleted = false) {
     if (includeDeleted) {
@@ -152,5 +153,54 @@ export class MenuRolesService {
     row.deletedBy = deletedBy ?? null;
 
     return this.repo.save(row);
+  }
+
+  async getMenuTreeByRole(roleId: string) {
+    const rows = await this.repo.find({
+      where: {
+        roleId,
+        isDelete: false, // soft delete en tb_menu_role
+      },
+      relations: ['menu'],
+    });
+
+    const nodes = rows
+      .filter(r => r.menu && !r.menu.isDeleted)
+      .map(r => ({
+        id: r.menu.id,
+        nombre: r.menu.nombre,
+        descripcion: r.menu.descripcion,
+        icon: r.menu.icon,
+        urlComponent: r.menu.urlComponent,
+        menuPosition: r.menu.menuPosition,
+        status: r.menu.status,
+        parentId: r.menu.menuId,
+
+        permissions: {
+          isReaded: r.isReaded,
+          isCreated: r.isCreated,
+          isEdited: r.isEdited,
+          permitDeleted: r.permitDeleted,
+          isReports: r.isReports,
+          reportsPermit: r.reportsPermit,
+        },
+
+        assignment: {
+          id: r.id,
+          status: r.status,
+          createdAt: r.createdAt,
+          updatedAt: r.updatedAt,
+        },
+      }));
+
+    const unique = new Map<string, any>();
+    for (const n of nodes) unique.set(n.id, n);
+
+    return buildMenuTree(
+      Array.from(unique.values()),
+      n => n.id,
+      n => n.parentId,
+      orderByMenuPosition,
+    );
   }
 }

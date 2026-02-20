@@ -9,7 +9,7 @@ import { UpdateMenuRoleDto } from './dto/update-menu-role.dto';
 @ApiBearerAuth('jwt')
 @Controller('menu-roles')
 export class MenuRolesController {
-  constructor(private readonly service: MenuRolesService) {}
+  constructor(private readonly service: MenuRolesService) { }
 
   @Get()
   @ApiQuery({ name: 'includeDeleted', required: false, type: Boolean })
@@ -25,6 +25,12 @@ export class MenuRolesController {
   ) {
     return this.service.findByRole(roleId, includeDeleted === 'true');
   }
+
+  @Get('tree/by-role/:roleId')
+  getTreeByRole(@Param('roleId') roleId: string) {
+    return this.service.getMenuTreeByRole(roleId);
+  }
+
 
   @Get(':id')
   findOne(@Param('id') id: string) {
