@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { buildMenuTree, orderByMenuPosition } from '../utility/menu-tree.util';
+import { buildMenuTree } from '../utility/menu-tree.util';
 
 import { TbMenuUser } from '../database/entities/tb-menu-user.entity';
 import { TbUser } from '../database/entities/tb-user.entity';
@@ -158,57 +158,41 @@ export class MenuUsersService {
   }
 
   async getMenuTreeByUser(userId: string) {
-  // Trae asignaciones + menu
-  const rows = await this.repo.find({
-    where: {
-      userId,
-      isDelete: false, // soft delete en tb_menu_user
-    },
-    relations: ['menu'],
-  });
+    const rows = await this.repo.find({
+      where: { userId, isDelete: false },
+      relations: ['menu'],
+    });
 
-  // Filtra por menu válido y no eliminado (tb_menu)
-  const nodes = rows
-    .filter(r => r.menu && !r.menu.isDeleted)
-    .map(r => ({
-      // info menú
-      id: r.menu.id,
-      nombre: r.menu.nombre,
-      descripcion: r.menu.descripcion,
-      icon: r.menu.icon,
-      urlComponent: r.menu.urlComponent,
-      menuPosition: r.menu.menuPosition,
-      status: r.menu.status,
-      parentId: r.menu.menuId, // 👈 padre
+    // 1) convertir asignación -> nodo menú
+    const nodes = rows
+      .filter(r => r.menu && !r.menu.isDeleted)
+      .map(r => ({
+        id: r.menu.id,
+        parentId: r.menu.menuId,         // 👈 clave del árbol
+        nombre: r.menu.nombre,
+        descripcion: r.menu.descripcion,
+        icon: r.menu.icon,
+        urlComponent: r.menu.urlComponent,
+        menuPosition: r.menu.menuPosition,
+        status: r.menu.status,
 
-      // permisos desde tb_menu_user
-      permissions: {
-        isReaded: r.isReaded,
-        isCreated: r.isCreated,
-        isEdited: r.isEdited,
-        permitDeleted: r.permitDeleted,
-        isReports: r.isReports,
-        reportsPermit: r.reportsPermit,
-      },
+        // permisos vienen de tb_menu_user
+        permissions: {
+          isReaded: r.isReaded,
+          isCreated: r.isCreated,
+          isEdited: r.isEdited,
+          permitDeleted: r.permitDeleted,
+          isReports: r.isReports,
+          reportsPermit: r.reportsPermit,
+        },
+      }));
 
-      // metadata asignación (opcional)
-      assignment: {
-        id: r.id,
-        status: r.status,
-        createdAt: r.createdAt,
-        updatedAt: r.updatedAt,
-      },
-    }));
+    // 2) deduplicar (por si acaso)
+    const unique = new Map<string, any>();
+    for (const n of nodes) unique.set(n.id, n);
 
-  // Quita duplicados por menú (por si existieran registros repetidos)
-  const unique = new Map<string, any>();
-  for (const n of nodes) unique.set(n.id, n);
+    // 3) construir árbol
+    return buildMenuTree([...unique.values()]);
+  }
 
-  return buildMenuTree(
-    Array.from(unique.values()),
-    n => n.id,
-    n => n.parentId,
-    orderByMenuPosition,
-  );
-}
 }

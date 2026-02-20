@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { buildMenuTree, orderByMenuPosition } from '../utility/menu-tree.util';
+import { buildMenuTree } from '../utility/menu-tree.util';
 
 import { TbMenuRole } from '../database/entities/tb-menu-role.entity';
 import { TbRole } from '../database/entities/tb-role.entity';
@@ -157,10 +157,7 @@ export class MenuRolesService {
 
   async getMenuTreeByRole(roleId: string) {
     const rows = await this.repo.find({
-      where: {
-        roleId,
-        isDelete: false, // soft delete en tb_menu_role
-      },
+      where: { roleId, isDelete: false },
       relations: ['menu'],
     });
 
@@ -168,13 +165,13 @@ export class MenuRolesService {
       .filter(r => r.menu && !r.menu.isDeleted)
       .map(r => ({
         id: r.menu.id,
+        parentId: r.menu.menuId,
         nombre: r.menu.nombre,
         descripcion: r.menu.descripcion,
         icon: r.menu.icon,
         urlComponent: r.menu.urlComponent,
         menuPosition: r.menu.menuPosition,
         status: r.menu.status,
-        parentId: r.menu.menuId,
 
         permissions: {
           isReaded: r.isReaded,
@@ -184,23 +181,11 @@ export class MenuRolesService {
           isReports: r.isReports,
           reportsPermit: r.reportsPermit,
         },
-
-        assignment: {
-          id: r.id,
-          status: r.status,
-          createdAt: r.createdAt,
-          updatedAt: r.updatedAt,
-        },
       }));
 
     const unique = new Map<string, any>();
     for (const n of nodes) unique.set(n.id, n);
 
-    return buildMenuTree(
-      Array.from(unique.values()),
-      n => n.id,
-      n => n.parentId,
-      orderByMenuPosition,
-    );
+    return buildMenuTree([...unique.values()]);
   }
 }
