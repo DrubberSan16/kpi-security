@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { buildMenuTree } from '../utility/menu-tree.util';
 import { TbMenu } from '../database/entities/tb-menu.entity';
 import { CreateMenuDto } from './dto/create-menu.dto';
 import { UpdateMenuDto } from './dto/update-menu.dto';
@@ -10,15 +11,35 @@ export class MenusService {
   constructor(
     @InjectRepository(TbMenu)
     private readonly repo: Repository<TbMenu>,
-  ) {}
+  ) { }
 
-  findAll(includeDeleted = false) {
-    if (includeDeleted) return this.repo.find({ order: { menuPosition: 'ASC' as any } });
-
-    return this.repo.find({
-      where: { isDeleted: false },
-      order: { menuPosition: 'ASC' as any },
+  async findAll(includeDeleted = false) {
+    const menus = await this.repo.find({
+      where: includeDeleted ? {} : { isDeleted: false },
+      order: { menuPosition: 'ASC' as any }, // ayuda, igual se reordena en árbol
     });
+
+    // Convertir entity -> node (y evitar relaciones pesadas)
+    const nodes = menus.map((m: TbMenu) => ({
+      id: m.id,
+      parentId: m.menuId,           // 👈 padre
+      nombre: m.nombre,
+      descripcion: m.descripcion,
+      icon: m.icon,
+      urlComponent: m.urlComponent,
+      menuPosition: m.menuPosition,
+      status: m.status,
+
+      createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
+      createdBy: m.createdBy,
+      updatedBy: m.updatedBy,
+      isDeleted: m.isDeleted,
+      deletedAt: m.deletedAt,
+      deletedBy: m.deletedBy,
+    }));
+
+    return buildMenuTree(nodes);
   }
 
   async findOne(id: string) {
