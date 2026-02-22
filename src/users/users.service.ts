@@ -93,6 +93,7 @@ export class UsersService {
     user.isDeleted = true;
     user.deletedAt = new Date();
     user.deletedBy = deletedBy ?? null;
+    user.status = "INACTIVE";
     return this.userRepo.save(user);
   }
 
