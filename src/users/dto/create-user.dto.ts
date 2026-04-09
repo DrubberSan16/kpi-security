@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsEmail,
   IsNotEmpty,
   IsOptional,
@@ -44,4 +45,13 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   createdBy?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Listado de reportes habilitados para el usuario. Vacío = acceso a todos.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  reportes?: string[];
 }

@@ -9,4 +9,18 @@ export class LoginResponseDto {
 
   @ApiProperty({ example: '1d' })
   expiresIn: string;
+
+  @ApiProperty({
+    example: {
+      id: 'uuid',
+      nameUser: 'dsanchez',
+      nameSurname: 'Drubber Sanchez',
+      email: 'demo@empresa.com',
+      roleId: 'uuid-role',
+      reportes: ['dashboard_ejecutivo'],
+      effectiveReportes: ['dashboard_ejecutivo'],
+      role: { id: 'uuid-role', nombre: 'Administrador', reportes: [] },
+    },
+  })
+  user: Record<string, unknown>;
 }

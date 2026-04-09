@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsArray, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateRoleDto {
   @ApiProperty({ maxLength: 100 })
@@ -22,4 +22,13 @@ export class CreateRoleDto {
   @IsString()
   @IsOptional()
   createdBy?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Listado de reportes habilitados para el rol. Vacío = acceso a todos.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  reportes?: string[];
 }

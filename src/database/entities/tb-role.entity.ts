@@ -24,6 +24,9 @@ export class TbRole {
   @Column({ type: 'text' })
   status: string;
 
+  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+  reportes: string[];
+
   @Column({ type: 'timestamp without time zone', name: 'created_at', default: () => 'now()' })
   createdAt: Date;
 

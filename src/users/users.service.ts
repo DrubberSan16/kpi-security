@@ -33,6 +33,11 @@ export class UsersService {
     return Number.isFinite(v) && v >= 8 ? v : 10;
   }
 
+  private normalizeReportes(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value.map((item) => String(item || '').trim()).filter(Boolean))];
+  }
+
   async findAll(includeDeleted = false) {
     if (includeDeleted) return this.userRepo.find({ relations: ['role'] });
 
@@ -61,6 +66,10 @@ export class UsersService {
     const entity = this.userRepo.create({
       ...dto,
       passUser: hashed,
+      reportes:
+        dto.reportes !== undefined
+          ? this.normalizeReportes(dto.reportes)
+          : this.normalizeReportes(role.reportes),
       tokenActive: null,
       updatedBy: null,
       isDeleted: false,
@@ -84,7 +93,11 @@ export class UsersService {
       dto.passUser = await bcrypt.hash(dto.passUser, this.saltRounds);
     }
 
-    await this.userRepo.update({ id }, dto);
+    const payload: Partial<TbUser> = { ...dto };
+    if (dto.reportes !== undefined) {
+      payload.reportes = this.normalizeReportes(dto.reportes);
+    }
+    await this.userRepo.update({ id }, payload);
     return this.findOne(id);
   }
 
@@ -148,7 +161,17 @@ export class UsersService {
         nameSurname: user.nameSurname,
         email: user.email,
         roleId: user.roleId,
-        role: user.role ? { id: user.role.id, nombre: user.role.nombre } : null,
+        reportes: this.normalizeReportes(user.reportes),
+        effectiveReportes: this.normalizeReportes(user.reportes).length
+          ? this.normalizeReportes(user.reportes)
+          : this.normalizeReportes(user.role?.reportes),
+        role: user.role
+          ? {
+              id: user.role.id,
+              nombre: user.role.nombre,
+              reportes: this.normalizeReportes(user.role.reportes),
+            }
+          : null,
       },
     };
   }

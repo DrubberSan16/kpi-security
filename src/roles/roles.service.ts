@@ -12,6 +12,11 @@ export class RolesService {
     private readonly repo: Repository<TbRole>,
   ) {}
 
+  private normalizeReportes(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value.map((item) => String(item || '').trim()).filter(Boolean))];
+  }
+
   findAll(includeDeleted = false) {
     if (includeDeleted) return this.repo.find();
     return this.repo.find({ where: { isDeleted: false } });
@@ -26,6 +31,7 @@ export class RolesService {
   async create(dto: CreateRoleDto) {
     const entity = this.repo.create({
       ...dto,
+      reportes: this.normalizeReportes(dto.reportes),
       createdBy: dto.createdBy ?? null,
       updatedBy: null,
       isDeleted: false,
@@ -37,7 +43,14 @@ export class RolesService {
 
   async update(id: string, dto: UpdateRoleDto) {
     await this.findOne(id);
-    await this.repo.update({ id }, { ...dto, updatedBy: (dto as any).updatedBy ?? null });
+    const payload: Partial<TbRole> = {
+      ...dto,
+      updatedBy: (dto as any).updatedBy ?? null,
+    };
+    if (dto.reportes !== undefined) {
+      payload.reportes = this.normalizeReportes(dto.reportes);
+    }
+    await this.repo.update({ id }, payload);
     return this.findOne(id);
   }
 
