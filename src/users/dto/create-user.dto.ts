@@ -64,4 +64,9 @@ export class CreateUserDto {
   @IsArray()
   @IsUUID('4', { each: true })
   sucursales?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  updatedBy?: string;
 }

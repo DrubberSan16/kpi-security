@@ -233,9 +233,7 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto, requesterRoleId?: string | null) {
-    const current = (await this.findOne(id, requesterRoleId)) as TbUser & {
-      sucursales?: string[];
-    };
+    const current = await this.findOne(id, requesterRoleId);
 
     if (dto.roleId) {
       await this.getVisibleRole(dto.roleId, requesterRoleId);
