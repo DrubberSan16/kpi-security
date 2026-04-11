@@ -39,7 +39,7 @@ export class UsersService {
     private readonly sucursalRepo: Repository<InventorySucursal>,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
-  ) {}
+  ) { }
 
   private get saltRounds(): number {
     const v = Number(this.config.get('BCRYPT_SALT_ROUNDS') || 10);
@@ -115,8 +115,8 @@ export class UsersService {
       const explicitIds = [...new Set(rowsByUser.get(user.id) ?? [])];
       const effectiveSucursales = explicitIds.length
         ? explicitIds
-            .map((item) => sucursalMap.get(item))
-            .filter((item): item is SucursalSummary => Boolean(item))
+          .map((item) => sucursalMap.get(item))
+          .filter((item): item is SucursalSummary => Boolean(item))
         : allSucursales;
 
       return {
@@ -139,8 +139,8 @@ export class UsersService {
     const normalized = this.normalizeSucursales(sucursales);
     const validSucursales = normalized.length
       ? await this.sucursalRepo.find({
-          where: { id: In(normalized), isDeleted: false } as any,
-        })
+        where: { id: In(normalized), isDeleted: false } as any,
+      })
       : [];
 
     if (normalized.length && validSucursales.length !== normalized.length) {
@@ -259,13 +259,29 @@ export class UsersService {
     return this.findOne(id, requesterRoleId);
   }
 
+  /* async remove(id: string, deletedBy?: string, requesterRoleId?: string | null) {
+     const user = (await this.findOne(id, requesterRoleId)) as TbUser;
+     user.isDeleted = true;
+     user.deletedAt = new Date();
+     user.deletedBy = deletedBy ?? null;
+     user.status = 'INACTIVE';
+     return this.userRepo.save(user);
+   }*/
+
   async remove(id: string, deletedBy?: string, requesterRoleId?: string | null) {
-    const user = (await this.findOne(id, requesterRoleId)) as TbUser;
-    user.isDeleted = true;
-    user.deletedAt = new Date();
-    user.deletedBy = deletedBy ?? null;
-    user.status = 'INACTIVE';
-    return this.userRepo.save(user);
+    await this.findOne(id, requesterRoleId); // valida existencia/visibilidad
+
+    await this.userRepo.update(
+      { id },
+      {
+        isDeleted: true,
+        deletedAt: new Date(),
+        deletedBy: deletedBy ?? null,
+        status: 'INACTIVE',
+      },
+    );
+
+    return this.findOne(id, requesterRoleId);
   }
 
   async getSucursalesCatalog() {
@@ -324,10 +340,10 @@ export class UsersService {
         allSucursales: Boolean(hydratedUser.allSucursales),
         role: user.role
           ? {
-              id: user.role.id,
-              nombre: user.role.nombre,
-              reportes: this.normalizeReportes(user.role.reportes),
-            }
+            id: user.role.id,
+            nombre: user.role.nombre,
+            reportes: this.normalizeReportes(user.role.reportes),
+          }
           : null,
       },
     };
