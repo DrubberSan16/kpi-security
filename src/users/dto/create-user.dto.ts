@@ -54,4 +54,14 @@ export class CreateUserDto {
   @IsArray()
   @IsString({ each: true })
   reportes?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Listado de sucursales habilitadas para el usuario. Vacio = acceso a todas las sucursales activas.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  sucursales?: string[];
 }

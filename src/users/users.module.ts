@@ -8,6 +8,8 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { TbUser } from '../database/entities/tb-user.entity';
 import { TbRole } from '../database/entities/tb-role.entity';
+import { TbUserSucursal } from '../database/entities/tb-user-sucursal.entity';
+import { InventorySucursal } from '../database/entities/inventory-sucursal.entity';
 
 function parseExpiresToSeconds(value?: string): number {
   if (!value) return 60 * 60 * 24; // 1d por defecto
@@ -36,7 +38,7 @@ function parseExpiresToSeconds(value?: string): number {
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TbUser, TbRole]),
+    TypeOrmModule.forFeature([TbUser, TbRole, TbUserSucursal, InventorySucursal]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
 
     JwtModule.registerAsync({

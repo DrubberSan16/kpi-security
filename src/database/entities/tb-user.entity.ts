@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { TbRole } from './tb-role.entity';
 import { TbMenuUser } from './tb-menu-user.entity';
+import { TbUserSucursal } from './tb-user-sucursal.entity';
 
 @Entity({ schema: 'kpi_security', name: 'tb_user' })
 @Index('idx_tb_user_created_at', ['createdAt'])
@@ -72,4 +73,7 @@ export class TbUser {
 
   @OneToMany(() => TbMenuUser, (mu) => mu.user)
   menuUsers: TbMenuUser[];
+
+  @OneToMany(() => TbUserSucursal, (userSucursal) => userSucursal.user)
+  userSucursales: TbUserSucursal[];
 }

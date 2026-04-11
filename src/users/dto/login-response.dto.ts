@@ -19,6 +19,9 @@ export class LoginResponseDto {
       roleId: 'uuid-role',
       reportes: ['dashboard_ejecutivo'],
       effectiveReportes: ['dashboard_ejecutivo'],
+      sucursales: ['uuid-sucursal'],
+      effectiveSucursales: [{ id: 'uuid-sucursal', codigo: 'MAT', nombre: 'Matriz' }],
+      allSucursales: false,
       role: { id: 'uuid-role', nombre: 'Administrador', reportes: [] },
     },
   })

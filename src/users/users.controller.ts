@@ -1,12 +1,13 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
   Query,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiQuery, ApiOkResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 
@@ -25,32 +26,36 @@ export class UsersController {
 
   @Get()
   @ApiQuery({ name: 'includeDeleted', required: false, type: Boolean })
-  findAll(@Query('includeDeleted') includeDeleted?: string) {
-    return this.service.findAll(includeDeleted === 'true');
+  findAll(@Query('includeDeleted') includeDeleted?: string, @Req() req?: any) {
+    return this.service.findAll(includeDeleted === 'true', req?.user?.roleId);
+  }
+
+  @Get('sucursales/catalogo')
+  getSucursalesCatalog() {
+    return this.service.getSucursalesCatalog();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+  findOne(@Param('id') id: string, @Req() req?: any) {
+    return this.service.findOne(id, req?.user?.roleId);
   }
 
   @Post()
-  create(@Body() dto: CreateUserDto) {
-    return this.service.create(dto);
+  create(@Body() dto: CreateUserDto, @Req() req?: any) {
+    return this.service.create(dto, req?.user?.roleId);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.service.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateUserDto, @Req() req?: any) {
+    return this.service.update(id, dto, req?.user?.roleId);
   }
 
   @Delete(':id')
   @ApiQuery({ name: 'deletedBy', required: false, type: String })
-  remove(@Param('id') id: string, @Query('deletedBy') deletedBy?: string) {
-    return this.service.remove(id, deletedBy);
+  remove(@Param('id') id: string, @Query('deletedBy') deletedBy?: string, @Req() req?: any) {
+    return this.service.remove(id, deletedBy, req?.user?.roleId);
   }
 
-  // ✅ LOGIN
   @Public()
   @Post('login')
   @ApiBody({ type: LoginDto })
