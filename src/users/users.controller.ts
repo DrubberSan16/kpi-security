@@ -27,33 +27,37 @@ export class UsersController {
   @Get()
   @ApiQuery({ name: 'includeDeleted', required: false, type: Boolean })
   findAll(@Query('includeDeleted') includeDeleted?: string, @Req() req?: any) {
-    return this.service.findAll(includeDeleted === 'true', req?.user?.roleId);
+    return this.service.findAll(
+      includeDeleted === 'true',
+      req?.user?.roleId,
+      req?.user?.userId,
+    );
   }
 
   @Get('sucursales/catalogo')
-  getSucursalesCatalog() {
-    return this.service.getSucursalesCatalog();
+  getSucursalesCatalog(@Req() req?: any) {
+    return this.service.getSucursalesCatalog(req?.user?.roleId, req?.user?.userId);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string, @Req() req?: any) {
-    return this.service.findOne(id, req?.user?.roleId);
+    return this.service.findOne(id, req?.user?.roleId, req?.user?.userId);
   }
 
   @Post()
   create(@Body() dto: CreateUserDto, @Req() req?: any) {
-    return this.service.create(dto, req?.user?.roleId);
+    return this.service.create(dto, req?.user?.roleId, req?.user?.userId);
   }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateUserDto, @Req() req?: any) {
-    return this.service.update(id, dto, req?.user?.roleId);
+    return this.service.update(id, dto, req?.user?.roleId, req?.user?.userId);
   }
 
   @Delete(':id')
   @ApiQuery({ name: 'deletedBy', required: false, type: String })
   remove(@Param('id') id: string, @Query('deletedBy') deletedBy?: string, @Req() req?: any) {
-    return this.service.remove(id, deletedBy, req?.user?.roleId);
+    return this.service.remove(id, deletedBy, req?.user?.roleId, req?.user?.userId);
   }
 
   @Public()

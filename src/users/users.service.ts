@@ -26,6 +26,11 @@ type SucursalSummary = {
   nombre: string;
 };
 
+type RequesterScope = {
+  isSuperAdmin: boolean;
+  allowedSucursalIds: string[] | null;
+};
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -56,6 +61,15 @@ export class UsersService {
     return [...new Set(value.map((item) => String(item || '').trim()).filter(Boolean))];
   }
 
+  private async getExplicitSucursalIdsForUser(userId?: string | null): Promise<string[]> {
+    if (!userId) return [];
+    const rows = await this.userSucursalRepo.find({
+      where: { userId, isDeleted: false },
+      select: { sucursalId: true } as any,
+    });
+    return [...new Set(rows.map((item) => item.sucursalId).filter(Boolean))];
+  }
+
   private async isRequesterSuperAdmin(requesterRoleId?: string | null) {
     if (!requesterRoleId) return false;
     const requesterRole = await this.roleRepo.findOne({
@@ -63,6 +77,58 @@ export class UsersService {
       select: { id: true, nombre: true } as any,
     });
     return isSuperAdministratorRoleName(requesterRole?.nombre);
+  }
+
+  private async getRequesterScope(
+    requesterUserId?: string | null,
+    requesterRoleId?: string | null,
+  ): Promise<RequesterScope> {
+    const isSuperAdmin = await this.isRequesterSuperAdmin(requesterRoleId);
+    if (isSuperAdmin || !requesterUserId) {
+      return { isSuperAdmin, allowedSucursalIds: null };
+    }
+
+    const explicitSucursalIds = await this.getExplicitSucursalIdsForUser(requesterUserId);
+    return {
+      isSuperAdmin: false,
+      allowedSucursalIds: explicitSucursalIds.length ? explicitSucursalIds : null,
+    };
+  }
+
+  private userMatchesSucursalScope(
+    user: any,
+    allowedSucursalIds: string[] | null,
+  ) {
+    if (!allowedSucursalIds?.length) return true;
+    const effectiveSucursalIds = [...new Set(
+      Array.isArray(user?.effectiveSucursales)
+        ? user.effectiveSucursales.map((item: any) => String(item?.id || '').trim()).filter(Boolean)
+        : [],
+    )];
+    return effectiveSucursalIds.some((item) => allowedSucursalIds.includes(item));
+  }
+
+  private async assertRequestedSucursalesWithinScope(
+    sucursales: string[] | undefined,
+    requesterUserId?: string | null,
+    requesterRoleId?: string | null,
+  ) {
+    const scope = await this.getRequesterScope(requesterUserId, requesterRoleId);
+    if (scope.isSuperAdmin || !scope.allowedSucursalIds?.length) return;
+
+    const normalized = this.normalizeSucursales(sucursales);
+    if (!normalized.length) {
+      throw new BadRequestException(
+        'Debes seleccionar una o más sucursales permitidas para este usuario.',
+      );
+    }
+
+    const invalid = normalized.filter((item) => !scope.allowedSucursalIds?.includes(item));
+    if (invalid.length) {
+      throw new BadRequestException(
+        'Solo puedes asignar sucursales dentro de las sucursales habilitadas para tu usuario.',
+      );
+    }
   }
 
   private async getActiveSucursales(): Promise<SucursalSummary[]> {
@@ -179,7 +245,11 @@ export class UsersService {
     await this.userSucursalRepo.save(freshRows);
   }
 
-  async findAll(includeDeleted = false, requesterRoleId?: string | null) {
+  async findAll(
+    includeDeleted = false,
+    requesterRoleId?: string | null,
+    requesterUserId?: string | null,
+  ) {
     const rows = await this.userRepo.find({
       where: includeDeleted ? undefined : { isDeleted: false },
       relations: ['role'],
@@ -190,10 +260,19 @@ export class UsersService {
       ? rows
       : rows.filter((item) => !isSuperAdministratorRoleName(item.role?.nombre));
 
-    return this.hydrateUsers(visibleRows);
+    const hydrated = await this.hydrateUsers(visibleRows);
+    const scope = await this.getRequesterScope(requesterUserId, requesterRoleId);
+
+    return hydrated.filter((item) =>
+      this.userMatchesSucursalScope(item, scope.allowedSucursalIds),
+    );
   }
 
-  async findOne(id: string, requesterRoleId?: string | null) {
+  async findOne(
+    id: string,
+    requesterRoleId?: string | null,
+    requesterUserId?: string | null,
+  ) {
     const user = await this.userRepo.findOne({
       where: { id },
       relations: ['role'],
@@ -206,11 +285,24 @@ export class UsersService {
       throw new NotFoundException('User no encontrado');
     }
     const [hydrated] = await this.hydrateUsers([user]);
+    const scope = await this.getRequesterScope(requesterUserId, requesterRoleId);
+    if (!this.userMatchesSucursalScope(hydrated, scope.allowedSucursalIds)) {
+      throw new NotFoundException('User no encontrado');
+    }
     return hydrated;
   }
 
-  async create(dto: CreateUserDto, requesterRoleId?: string | null) {
+  async create(
+    dto: CreateUserDto,
+    requesterRoleId?: string | null,
+    requesterUserId?: string | null,
+  ) {
     const role = await this.getVisibleRole(dto.roleId, requesterRoleId);
+    await this.assertRequestedSucursalesWithinScope(
+      dto.sucursales,
+      requesterUserId,
+      requesterRoleId,
+    );
     const hashed = await bcrypt.hash(dto.passUser, this.saltRounds);
 
     const entity = this.userRepo.create({
@@ -229,14 +321,27 @@ export class UsersService {
 
     const saved = await this.userRepo.save(entity);
     await this.syncUserSucursales(saved.id, dto.sucursales, dto.createdBy ?? dto.nameUser);
-    return this.findOne(saved.id, requesterRoleId);
+    return this.findOne(saved.id, requesterRoleId, requesterUserId);
   }
 
-  async update(id: string, dto: UpdateUserDto, requesterRoleId?: string | null) {
-    const current = await this.findOne(id, requesterRoleId);
+  async update(
+    id: string,
+    dto: UpdateUserDto,
+    requesterRoleId?: string | null,
+    requesterUserId?: string | null,
+  ) {
+    const current = await this.findOne(id, requesterRoleId, requesterUserId);
 
     if (dto.roleId) {
       await this.getVisibleRole(dto.roleId, requesterRoleId);
+    }
+
+    if (dto.sucursales !== undefined) {
+      await this.assertRequestedSucursalesWithinScope(
+        dto.sucursales,
+        requesterUserId,
+        requesterRoleId,
+      );
     }
 
     if (dto.passUser) {
@@ -256,7 +361,7 @@ export class UsersService {
       dto.sucursales,
       dto.updatedBy ?? dto.createdBy ?? current.nameUser,
     );
-    return this.findOne(id, requesterRoleId);
+    return this.findOne(id, requesterRoleId, requesterUserId);
   }
 
   /* async remove(id: string, deletedBy?: string, requesterRoleId?: string | null) {
@@ -268,8 +373,13 @@ export class UsersService {
      return this.userRepo.save(user);
    }*/
 
-  async remove(id: string, deletedBy?: string, requesterRoleId?: string | null) {
-    await this.findOne(id, requesterRoleId); // valida existencia/visibilidad
+  async remove(
+    id: string,
+    deletedBy?: string,
+    requesterRoleId?: string | null,
+    requesterUserId?: string | null,
+  ) {
+    await this.findOne(id, requesterRoleId, requesterUserId); // valida existencia/visibilidad
 
     await this.userRepo.update(
       { id },
@@ -281,11 +391,19 @@ export class UsersService {
       },
     );
 
-    return this.findOne(id, requesterRoleId);
+    return this.findOne(id, requesterRoleId, requesterUserId);
   }
 
-  async getSucursalesCatalog() {
-    return this.getActiveSucursales();
+  async getSucursalesCatalog(
+    requesterRoleId?: string | null,
+    requesterUserId?: string | null,
+  ) {
+    const all = await this.getActiveSucursales();
+    const scope = await this.getRequesterScope(requesterUserId, requesterRoleId);
+    if (!scope.allowedSucursalIds?.length) {
+      return all;
+    }
+    return all.filter((item) => scope.allowedSucursalIds?.includes(item.id));
   }
 
   async login(dto: LoginDto) {
