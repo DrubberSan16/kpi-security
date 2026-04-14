@@ -105,7 +105,7 @@ export class UsersService {
         ? user.effectiveSucursales.map((item: any) => String(item?.id || '').trim()).filter(Boolean)
         : [],
     )];
-    return effectiveSucursalIds.some((item) => allowedSucursalIds.includes(item));
+    return effectiveSucursalIds.some((item: any) => allowedSucursalIds.includes(item));
   }
 
   private async assertRequestedSucursalesWithinScope(
