@@ -23,6 +23,9 @@ import { AuthModule } from './auth/auth.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const sslEnabled = String(config.get('DB_SSL') || 'false') === 'true';
+        const appTimeZone =
+          String(config.get('APP_TIMEZONE') || '').trim() ||
+          'America/Guayaquil';
 
         return {
           type: 'postgres',
@@ -39,7 +42,7 @@ import { AuthModule } from './auth/auth.module';
           // Para Postgres remoto (RDS/managed), activa si aplica:
           ssl: sslEnabled ? { rejectUnauthorized: false } : false,
           extra: {
-            options: '-c timezone=UTC'
+            options: `-c timezone=${appTimeZone}`
           }
         };
       },
