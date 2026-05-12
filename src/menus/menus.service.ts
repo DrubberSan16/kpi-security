@@ -1,4 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { buildMenuTree } from '../utility/menu-tree.util';
@@ -8,28 +15,28 @@ import { UpdateMenuDto } from './dto/update-menu.dto';
 
 @Injectable()
 export class MenusService {
+  private readonly logger = new Logger(MenusService.name);
+
   constructor(
     @InjectRepository(TbMenu)
     private readonly repo: Repository<TbMenu>,
-  ) { }
+  ) {}
 
   async findAll(includeDeleted = false) {
     const menus = await this.repo.find({
       where: includeDeleted ? {} : { isDeleted: false },
-      order: { menuPosition: 'ASC' as any }, // ayuda, igual se reordena en árbol
+      order: { menuPosition: 'ASC' as any },
     });
 
-    // Convertir entity -> node (y evitar relaciones pesadas)
     const nodes = menus.map((m: TbMenu) => ({
       id: m.id,
-      parentId: m.menuId,           // 👈 padre
+      parentId: m.menuId,
       nombre: m.nombre,
       descripcion: m.descripcion,
       icon: m.icon,
       urlComponent: m.urlComponent,
       menuPosition: m.menuPosition,
       status: m.status,
-
       createdAt: m.createdAt,
       updatedAt: m.updatedAt,
       createdBy: m.createdBy,
@@ -48,57 +55,186 @@ export class MenusService {
     return row;
   }
 
+  private normalizeRequiredText(value: unknown, fieldLabel: string) {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) {
+      throw new BadRequestException(`${fieldLabel} es obligatorio`);
+    }
+    return normalized;
+  }
+
+  private normalizeNullableText(value: unknown) {
+    const normalized = String(value ?? '').trim();
+    return normalized || null;
+  }
+
+  private async findMenuByNormalizedName(nombre: string, excludeId?: string) {
+    const qb = this.repo
+      .createQueryBuilder('menu')
+      .where('LOWER(TRIM(menu.nombre)) = LOWER(TRIM(:nombre))', { nombre });
+
+    if (excludeId) {
+      qb.andWhere('menu.id <> :excludeId', { excludeId });
+    }
+
+    return qb
+      .orderBy('menu.isDeleted', 'ASC')
+      .addOrderBy('menu.updatedAt', 'DESC')
+      .addOrderBy('menu.createdAt', 'DESC')
+      .getOne();
+  }
+
+  private handlePersistenceError(action: string, error: unknown): never {
+    const anyError = error as any;
+    const message =
+      String(
+        anyError?.driverError?.detail ||
+          anyError?.driverError?.message ||
+          anyError?.message ||
+          'desconocido',
+      ).trim() || 'desconocido';
+    const code = String(
+      anyError?.driverError?.code || anyError?.code || '',
+    ).trim();
+    const constraint = String(
+      anyError?.driverError?.constraint || anyError?.constraint || '',
+    ).trim();
+
+    this.logger.error(
+      `Menu ${action} error: ${message}`,
+      anyError?.stack || undefined,
+    );
+
+    if (code === '23505' && /tb_menu_nombre_key/i.test(constraint)) {
+      throw new ConflictException(
+        'Ya existe un menu con ese nombre. Si fue eliminado previamente, debe reactivarse en lugar de crearlo de nuevo.',
+      );
+    }
+
+    throw new InternalServerErrorException('No se pudo guardar el menu.');
+  }
+
   private async validateParent(menuId?: string, selfId?: string) {
     if (!menuId) return;
 
     if (selfId && menuId === selfId) {
-      throw new BadRequestException('menuId no puede apuntar a sí mismo');
+      throw new BadRequestException('menuId no puede apuntar a si mismo');
     }
 
-    // Como en dump NO hay FK, validamos a nivel app si existe (opcional pero recomendado)
-    const parent = await this.repo.findOne({ where: { id: menuId } });
+    const parent = await this.repo.findOne({
+      where: { id: menuId, isDeleted: false },
+    });
     if (!parent) {
-      throw new BadRequestException('menuId (menú padre) no existe');
+      throw new BadRequestException(
+        'menuId (menu padre) no existe o se encuentra eliminado',
+      );
     }
   }
 
   async create(dto: CreateMenuDto) {
     await this.validateParent(dto.menuId);
 
+    const nombre = this.normalizeRequiredText(dto.nombre, 'nombre');
+    const existingByName = await this.findMenuByNormalizedName(nombre);
+
+    if (existingByName && !existingByName.isDeleted) {
+      throw new ConflictException('Ya existe un menu activo con ese nombre');
+    }
+
+    if (existingByName?.isDeleted) {
+      existingByName.nombre = nombre;
+      existingByName.descripcion = this.normalizeNullableText(dto.descripcion);
+      existingByName.menuId = dto.menuId ?? null;
+      existingByName.urlComponent = this.normalizeNullableText(dto.urlComponent);
+      existingByName.menuPosition = this.normalizeRequiredText(
+        dto.menuPosition,
+        'menuPosition',
+      );
+      existingByName.status = this.normalizeRequiredText(dto.status, 'status');
+      existingByName.icon = this.normalizeNullableText(dto.icon);
+      existingByName.updatedBy = this.normalizeNullableText(dto.createdBy);
+      existingByName.isDeleted = false;
+      existingByName.deletedAt = null;
+      existingByName.deletedBy = null;
+
+      try {
+        return await this.repo.save(existingByName);
+      } catch (error) {
+        this.handlePersistenceError('restore/create', error);
+      }
+    }
+
     const entity = this.repo.create({
-      nombre: dto.nombre,
-      descripcion: dto.descripcion ?? null,
+      nombre,
+      descripcion: this.normalizeNullableText(dto.descripcion),
       menuId: dto.menuId ?? null,
-      urlComponent: dto.urlComponent ?? null,
-      menuPosition: dto.menuPosition,
-      status: dto.status,
-      icon: dto.icon ?? null,
-
-      createdBy: dto.createdBy ?? null,
+      urlComponent: this.normalizeNullableText(dto.urlComponent),
+      menuPosition: this.normalizeRequiredText(
+        dto.menuPosition,
+        'menuPosition',
+      ),
+      status: this.normalizeRequiredText(dto.status, 'status'),
+      icon: this.normalizeNullableText(dto.icon),
+      createdBy: this.normalizeNullableText(dto.createdBy),
       updatedBy: null,
-
       isDeleted: false,
       deletedAt: null,
       deletedBy: null,
     });
 
-    return this.repo.save(entity);
+    try {
+      return await this.repo.save(entity);
+    } catch (error) {
+      this.handlePersistenceError('create', error);
+    }
   }
 
   async update(id: string, dto: UpdateMenuDto) {
-    await this.findOne(id);
+    const row = await this.findOne(id);
     await this.validateParent(dto.menuId, id);
 
-    const patch: Partial<TbMenu> = {
-      ...dto,
-      descripcion: dto.descripcion ?? undefined,
-      menuId: dto.menuId ?? undefined,
-      urlComponent: dto.urlComponent ?? undefined,
-      icon: dto.icon ?? undefined,
-    };
+    if (dto.nombre !== undefined) {
+      const nombre = this.normalizeRequiredText(dto.nombre, 'nombre');
+      const existingByName = await this.findMenuByNormalizedName(nombre, id);
+      if (existingByName && !existingByName.isDeleted) {
+        throw new ConflictException('Ya existe un menu activo con ese nombre');
+      }
+      if (existingByName?.isDeleted) {
+        throw new ConflictException(
+          'Existe un menu eliminado con ese nombre. Reutiliza ese menu o cambia el nombre.',
+        );
+      }
+      row.nombre = nombre;
+    }
 
-    await this.repo.update({ id }, patch);
-    return this.findOne(id);
+    if (dto.descripcion !== undefined) {
+      row.descripcion = this.normalizeNullableText(dto.descripcion);
+    }
+    if (dto.menuId !== undefined) {
+      row.menuId = dto.menuId ?? null;
+    }
+    if (dto.urlComponent !== undefined) {
+      row.urlComponent = this.normalizeNullableText(dto.urlComponent);
+    }
+    if (dto.menuPosition !== undefined) {
+      row.menuPosition = this.normalizeRequiredText(
+        dto.menuPosition,
+        'menuPosition',
+      );
+    }
+    if (dto.status !== undefined) {
+      row.status = this.normalizeRequiredText(dto.status, 'status');
+    }
+    if (dto.icon !== undefined) {
+      row.icon = this.normalizeNullableText(dto.icon);
+    }
+    row.updatedBy = this.normalizeNullableText(dto.createdBy) ?? row.updatedBy;
+
+    try {
+      return await this.repo.save(row);
+    } catch (error) {
+      this.handlePersistenceError('update', error);
+    }
   }
 
   async remove(id: string, deletedBy?: string) {
@@ -108,6 +244,10 @@ export class MenusService {
     row.deletedAt = new Date();
     row.deletedBy = deletedBy ?? null;
 
-    return this.repo.save(row);
+    try {
+      return await this.repo.save(row);
+    } catch (error) {
+      this.handlePersistenceError('delete', error);
+    }
   }
 }
