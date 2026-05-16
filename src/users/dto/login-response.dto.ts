@@ -13,8 +13,8 @@ export class LoginResponseDto {
   @ApiProperty({
     example: {
       id: 'uuid',
-      nameUser: 'dsanchez',
-      nameSurname: 'Drubber Sanchez',
+      nameUser: 'user',
+      nameSurname: 'nameComplete',
       email: 'demo@empresa.com',
       roleId: 'uuid-role',
       reportes: ['dashboard_ejecutivo'],

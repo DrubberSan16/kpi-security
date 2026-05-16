@@ -432,6 +432,9 @@ export class UsersService {
       sub: user.id,
       nameUser: user.nameUser,
       roleId: user.roleId,
+      email: hydratedUser.email,
+      nameSurname: hydratedUser.nameSurname,
+      roleName: user.role?.nombre ?? null,
     };
 
     const accessToken = await this.jwtService.signAsync(payload);
