@@ -42,7 +42,10 @@ import { AuthModule } from './auth/auth.module';
           // Para Postgres remoto (RDS/managed), activa si aplica:
           ssl: sslEnabled ? { rejectUnauthorized: false } : false,
           extra: {
-            options: `-c timezone=${appTimeZone}`
+            options: `-c timezone=${appTimeZone}`,
+            max: 5,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 5000,
           }
         };
       },
