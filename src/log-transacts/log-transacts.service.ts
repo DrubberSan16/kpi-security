@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { TbLogTransact } from '../database/entities/tb-log-transact.entity';
 import { CreateLogTransactDto } from './dto/create-log-transact.dto';
 import { UpdateLogTransactDto } from './dto/update-log-transact.dto';
+import { normalizeTimestampPayload } from '../common/utils/local-timestamp.util';
 
 type FindAllFilters = {
   includeDeleted?: boolean;
@@ -61,7 +62,7 @@ export class LogTransactsService {
   }
 
   async create(dto: CreateLogTransactDto) {
-    const entity = this.repo.create({
+    const entity = this.repo.create(normalizeTimestampPayload(this.repo, {
       moduleMicroservice: dto.moduleMicroservice,
       typeLog: dto.typeLog ?? null,
       description: dto.description ?? null,
@@ -73,7 +74,7 @@ export class LogTransactsService {
       isDeleted: false,
       deletedAt: null,
       deletedBy: null,
-    });
+    }));
 
     return this.repo.save(entity);
   }
@@ -87,7 +88,7 @@ export class LogTransactsService {
       description: dto.description ?? undefined,
     };
 
-    await this.repo.update({ id }, patch);
+    await this.repo.update({ id }, normalizeTimestampPayload(this.repo, patch));
     return this.findOne(id);
   }
 

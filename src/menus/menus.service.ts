@@ -12,6 +12,7 @@ import { buildMenuTree } from '../utility/menu-tree.util';
 import { TbMenu } from '../database/entities/tb-menu.entity';
 import { CreateMenuDto } from './dto/create-menu.dto';
 import { UpdateMenuDto } from './dto/update-menu.dto';
+import { normalizeTimestampPayload } from '../common/utils/local-timestamp.util';
 
 @Injectable()
 export class MenusService {
@@ -164,7 +165,7 @@ export class MenusService {
       }
     }
 
-    const entity = this.repo.create({
+    const entity = this.repo.create(normalizeTimestampPayload(this.repo, {
       nombre,
       descripcion: this.normalizeNullableText(dto.descripcion),
       menuId: dto.menuId ?? null,
@@ -180,7 +181,7 @@ export class MenusService {
       isDeleted: false,
       deletedAt: null,
       deletedBy: null,
-    });
+    }));
 
     try {
       return await this.repo.save(entity);

@@ -5,6 +5,7 @@ import { TbRole } from '../database/entities/tb-role.entity';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { isSuperAdministratorRoleName } from '../common/utils/role-visibility.util';
+import { normalizeTimestampPayload } from '../common/utils/local-timestamp.util';
 
 @Injectable()
 export class RolesService {
@@ -57,7 +58,7 @@ export class RolesService {
 
   async create(dto: CreateRoleDto, requesterRoleId?: string | null) {
     await this.assertCanManageSuperAdminRole(requesterRoleId, dto.nombre);
-    const entity = this.repo.create({
+    const entity = this.repo.create(normalizeTimestampPayload(this.repo, {
       ...dto,
       reportes: this.normalizeReportes(dto.reportes),
       createdBy: dto.createdBy ?? null,
@@ -65,7 +66,7 @@ export class RolesService {
       isDeleted: false,
       deletedAt: null,
       deletedBy: null,
-    });
+    }));
     return this.repo.save(entity);
   }
 
@@ -83,7 +84,7 @@ export class RolesService {
     if (dto.reportes !== undefined) {
       payload.reportes = this.normalizeReportes(dto.reportes);
     }
-    await this.repo.update({ id }, payload);
+    await this.repo.update({ id }, normalizeTimestampPayload(this.repo, payload));
     return this.findOne(id, requesterRoleId);
   }
 

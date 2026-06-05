@@ -19,6 +19,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { isSuperAdministratorRoleName } from '../common/utils/role-visibility.util';
+import { normalizeTimestampPayload } from '../common/utils/local-timestamp.util';
 
 type SucursalSummary = {
   id: string;
@@ -232,7 +233,7 @@ export class UsersService {
     if (!normalized.length) return;
 
     const freshRows = normalized.map((sucursalId) =>
-      this.userSucursalRepo.create({
+      this.userSucursalRepo.create(normalizeTimestampPayload(this.userSucursalRepo, {
         userId,
         sucursalId,
         createdBy: userName,
@@ -240,7 +241,7 @@ export class UsersService {
         isDeleted: false,
         deletedAt: null,
         deletedBy: null,
-      }),
+      })),
     );
     await this.userSucursalRepo.save(freshRows);
   }
@@ -305,7 +306,7 @@ export class UsersService {
     );
     const hashed = await bcrypt.hash(dto.passUser, this.saltRounds);
 
-    const entity = this.userRepo.create({
+    const entity = this.userRepo.create(normalizeTimestampPayload(this.userRepo, {
       ...dto,
       passUser: hashed,
       reportes:
@@ -317,7 +318,7 @@ export class UsersService {
       isDeleted: false,
       deletedAt: null,
       deletedBy: null,
-    });
+    }));
 
     const saved = await this.userRepo.save(entity);
     await this.syncUserSucursales(saved.id, dto.sucursales, dto.createdBy ?? dto.nameUser);
@@ -355,7 +356,7 @@ export class UsersService {
       payload.reportes = this.normalizeReportes(dto.reportes);
     }
 
-    await this.userRepo.update({ id }, payload);
+    await this.userRepo.update({ id }, normalizeTimestampPayload(this.userRepo, payload));
     await this.syncUserSucursales(
       id,
       dto.sucursales,
@@ -383,12 +384,12 @@ export class UsersService {
 
     await this.userRepo.update(
       { id },
-      {
+      normalizeTimestampPayload(this.userRepo, {
         isDeleted: true,
         deletedAt: new Date(),
         deletedBy: deletedBy ?? null,
         status: 'INACTIVE',
-      },
+      }),
     );
 
     return this.findOne(id, requesterRoleId, requesterUserId);

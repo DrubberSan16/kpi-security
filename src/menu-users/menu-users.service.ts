@@ -9,6 +9,7 @@ import { TbMenu } from '../database/entities/tb-menu.entity';
 
 import { CreateMenuUserDto } from './dto/create-menu-user.dto';
 import { UpdateMenuUserDto } from './dto/update-menu-user.dto';
+import { normalizeTimestampPayload } from '../common/utils/local-timestamp.util';
 
 @Injectable()
 export class MenuUsersService {
@@ -95,7 +96,7 @@ export class MenuUsersService {
       return this.repo.save(exists);
     }
 
-    const entity = this.repo.create({
+    const entity = this.repo.create(normalizeTimestampPayload(this.repo, {
       userId: dto.userId,
       menuId: dto.menuId,
       status: dto.status,
@@ -113,7 +114,7 @@ export class MenuUsersService {
       permitDeleted: dto.permitDeleted ?? null,
       isReports: dto.isReports ?? null,
       reportsPermit: dto.reportsPermit ?? null,
-    });
+    }));
 
     return this.repo.save(entity);
   }
@@ -143,7 +144,7 @@ export class MenuUsersService {
       reportsPermit: dto.reportsPermit ?? undefined,
     };
 
-    await this.repo.update({ id }, patch);
+    await this.repo.update({ id }, normalizeTimestampPayload(this.repo, patch));
     return this.findOne(id);
   }
 
