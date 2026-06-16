@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -13,6 +14,7 @@ import * as bcrypt from 'bcrypt';
 import { TbUser } from '../database/entities/tb-user.entity';
 import { TbRole } from '../database/entities/tb-role.entity';
 import { TbUserSucursal } from '../database/entities/tb-user-sucursal.entity';
+import { TbMenuUser } from '../database/entities/tb-menu-user.entity';
 import { InventorySucursal } from '../database/entities/inventory-sucursal.entity';
 
 import { CreateUserDto } from './dto/create-user.dto';
@@ -78,6 +80,13 @@ export class UsersService {
       select: { id: true, nombre: true } as any,
     });
     return isSuperAdministratorRoleName(requesterRole?.nombre);
+  }
+
+  private assertCanPurge(roleName?: string) {
+    if (isSuperAdministratorRoleName(roleName)) return;
+    throw new ForbiddenException(
+      'Solo el Super Administrador puede ejecutar eliminacion real masiva.',
+    );
   }
 
   private async getRequesterScope(
@@ -405,6 +414,39 @@ export class UsersService {
       return all;
     }
     return all.filter((item) => scope.allowedSucursalIds?.includes(item.id));
+  }
+
+  async purgeAll(roleName?: string) {
+    this.assertCanPurge(roleName);
+    const result = await this.userRepo.manager.transaction(async (manager) => {
+      const userSucursales = await manager
+        .createQueryBuilder()
+        .delete()
+        .from(TbUserSucursal)
+        .execute();
+      const menuUsers = await manager
+        .createQueryBuilder()
+        .delete()
+        .from(TbMenuUser)
+        .execute();
+      const users = await manager
+        .createQueryBuilder()
+        .delete()
+        .from(TbUser)
+        .execute();
+
+      return {
+        user_sucursales: Number(userSucursales.affected || 0),
+        menu_users: Number(menuUsers.affected || 0),
+        users: Number(users.affected || 0),
+      };
+    });
+
+    return {
+      message: `Eliminacion real masiva ejecutada correctamente (${result.users} usuarios).`,
+      affected: result.users,
+      details: result,
+    };
   }
 
   async login(dto: LoginDto) {

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { MenusService } from './menus.service';
 import { CreateMenuDto } from './dto/create-menu.dto';
@@ -29,6 +29,11 @@ export class MenusController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateMenuDto) {
     return this.service.update(id, dto);
+  }
+
+  @Delete('purge-all')
+  purgeAll(@Headers('x-role-name') roleName?: string) {
+    return this.service.purgeAll(roleName);
   }
 
   @Delete(':id')

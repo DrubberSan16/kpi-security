@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -10,9 +11,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { buildMenuTree } from '../utility/menu-tree.util';
 import { TbMenu } from '../database/entities/tb-menu.entity';
+import { TbMenuRole } from '../database/entities/tb-menu-role.entity';
+import { TbMenuUser } from '../database/entities/tb-menu-user.entity';
 import { CreateMenuDto } from './dto/create-menu.dto';
 import { UpdateMenuDto } from './dto/update-menu.dto';
 import { normalizeTimestampPayload } from '../common/utils/local-timestamp.util';
+import { isSuperAdministratorRoleName } from '../common/utils/role-visibility.util';
 
 @Injectable()
 export class MenusService {
@@ -22,6 +26,13 @@ export class MenusService {
     @InjectRepository(TbMenu)
     private readonly repo: Repository<TbMenu>,
   ) {}
+
+  private assertCanPurge(roleName?: string) {
+    if (isSuperAdministratorRoleName(roleName)) return;
+    throw new ForbiddenException(
+      'Solo el Super Administrador puede ejecutar eliminacion real masiva.',
+    );
+  }
 
   async findAll(includeDeleted = false) {
     const menus = await this.repo.find({
@@ -250,5 +261,38 @@ export class MenusService {
     } catch (error) {
       this.handlePersistenceError('delete', error);
     }
+  }
+
+  async purgeAll(roleName?: string) {
+    this.assertCanPurge(roleName);
+    const result = await this.repo.manager.transaction(async (manager) => {
+      const menuUsers = await manager
+        .createQueryBuilder()
+        .delete()
+        .from(TbMenuUser)
+        .execute();
+      const menuRoles = await manager
+        .createQueryBuilder()
+        .delete()
+        .from(TbMenuRole)
+        .execute();
+      const menus = await manager
+        .createQueryBuilder()
+        .delete()
+        .from(TbMenu)
+        .execute();
+
+      return {
+        menu_users: Number(menuUsers.affected || 0),
+        menu_roles: Number(menuRoles.affected || 0),
+        menus: Number(menus.affected || 0),
+      };
+    });
+
+    return {
+      message: `Eliminacion real masiva ejecutada correctamente (${result.menus} menus).`,
+      affected: result.menus,
+      details: result,
+    };
   }
 }

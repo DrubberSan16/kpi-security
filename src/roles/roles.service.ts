@@ -1,7 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TbRole } from '../database/entities/tb-role.entity';
+import { TbUser } from '../database/entities/tb-user.entity';
+import { TbMenuRole } from '../database/entities/tb-menu-role.entity';
+import { TbMenuUser } from '../database/entities/tb-menu-user.entity';
+import { TbUserSucursal } from '../database/entities/tb-user-sucursal.entity';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { isSuperAdministratorRoleName } from '../common/utils/role-visibility.util';
@@ -26,6 +30,13 @@ export class RolesService {
       select: { id: true, nombre: true } as any,
     });
     return isSuperAdministratorRoleName(requesterRole?.nombre);
+  }
+
+  private assertCanPurge(roleName?: string) {
+    if (isSuperAdministratorRoleName(roleName)) return;
+    throw new ForbiddenException(
+      'Solo el Super Administrador puede ejecutar eliminacion real masiva.',
+    );
   }
 
   private async assertCanManageSuperAdminRole(
@@ -94,5 +105,50 @@ export class RolesService {
     row.deletedAt = new Date();
     row.deletedBy = deletedBy ?? null;
     return this.repo.save(row);
+  }
+
+  async purgeAll(roleName?: string) {
+    this.assertCanPurge(roleName);
+    const result = await this.repo.manager.transaction(async (manager) => {
+      const userSucursales = await manager
+        .createQueryBuilder()
+        .delete()
+        .from(TbUserSucursal)
+        .execute();
+      const menuUsers = await manager
+        .createQueryBuilder()
+        .delete()
+        .from(TbMenuUser)
+        .execute();
+      const users = await manager
+        .createQueryBuilder()
+        .delete()
+        .from(TbUser)
+        .execute();
+      const menuRoles = await manager
+        .createQueryBuilder()
+        .delete()
+        .from(TbMenuRole)
+        .execute();
+      const roles = await manager
+        .createQueryBuilder()
+        .delete()
+        .from(TbRole)
+        .execute();
+
+      return {
+        user_sucursales: Number(userSucursales.affected || 0),
+        menu_users: Number(menuUsers.affected || 0),
+        users: Number(users.affected || 0),
+        menu_roles: Number(menuRoles.affected || 0),
+        roles: Number(roles.affected || 0),
+      };
+    });
+
+    return {
+      message: `Eliminacion real masiva ejecutada correctamente (${result.roles} roles).`,
+      affected: result.roles,
+      details: result,
+    };
   }
 }

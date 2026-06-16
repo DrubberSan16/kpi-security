@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
@@ -39,6 +40,11 @@ export class RolesController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateRoleDto, @Req() req?: any) {
     return this.service.update(id, dto, req?.user?.roleId);
+  }
+
+  @Delete('purge-all')
+  purgeAll(@Headers('x-role-name') roleName?: string) {
+    return this.service.purgeAll(roleName);
   }
 
   @Delete(':id')
