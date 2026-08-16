@@ -21,7 +21,7 @@ export class TbUser {
 
   @Column({ type: 'text', name: 'name_user' })
   nameUser: string;
-  
+
   @Column({ type: 'text', name: 'pass_user', select: false })
   passUser: string;
 
@@ -37,7 +37,10 @@ export class TbUser {
   @Column({ type: 'uuid', name: 'role_id' })
   roleId: string;
 
-  @ManyToOne(() => TbRole, (r) => r.users, { onDelete: 'RESTRICT', onUpdate: 'CASCADE' })
+  @ManyToOne(() => TbRole, (r) => r.users, {
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE',
+  })
   @JoinColumn({ name: 'role_id' })
   role: TbRole;
 
@@ -47,13 +50,27 @@ export class TbUser {
   @Column({ type: 'text' })
   status: string;
 
+  @Column({ type: 'boolean', name: 'es_destinatario', default: false })
+  esDestinatario: boolean;
+
+  @Column({ type: 'text', name: 'identificacion', nullable: true })
+  identificacion: string | null;
+
   @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
   reportes: string[];
 
-  @Column({ type: 'timestamp without time zone', name: 'created_at', default: () => 'now()' })
+  @Column({
+    type: 'timestamp without time zone',
+    name: 'created_at',
+    default: () => 'now()',
+  })
   createdAt: Date;
 
-  @Column({ type: 'timestamp without time zone', name: 'updated_at', default: () => 'now()' })
+  @Column({
+    type: 'timestamp without time zone',
+    name: 'updated_at',
+    default: () => 'now()',
+  })
   updatedAt: Date;
 
   @Column({ type: 'text', name: 'created_by', nullable: true })
@@ -65,7 +82,11 @@ export class TbUser {
   @Column({ type: 'boolean', name: 'is_deleted', default: false })
   isDeleted: boolean;
 
-  @Column({ type: 'timestamp without time zone', name: 'deleted_at', nullable: true })
+  @Column({
+    type: 'timestamp without time zone',
+    name: 'deleted_at',
+    nullable: true,
+  })
   deletedAt: Date | null;
 
   @Column({ type: 'text', name: 'deleted_by', nullable: true })

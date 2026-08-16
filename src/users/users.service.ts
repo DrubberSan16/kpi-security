@@ -47,7 +47,7 @@ export class UsersService {
     private readonly sucursalRepo: Repository<InventorySucursal>,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
-  ) { }
+  ) {}
 
   private get saltRounds(): number {
     const v = Number(this.config.get('BCRYPT_SALT_ROUNDS') || 10);
@@ -56,15 +56,43 @@ export class UsersService {
 
   private normalizeReportes(value: unknown): string[] {
     if (!Array.isArray(value)) return [];
-    return [...new Set(value.map((item) => String(item || '').trim()).filter(Boolean))];
+    return [
+      ...new Set(
+        value.map((item) => String(item || '').trim()).filter(Boolean),
+      ),
+    ];
   }
 
   private normalizeSucursales(value: unknown): string[] {
     if (!Array.isArray(value)) return [];
-    return [...new Set(value.map((item) => String(item || '').trim()).filter(Boolean))];
+    return [
+      ...new Set(
+        value.map((item) => String(item || '').trim()).filter(Boolean),
+      ),
+    ];
   }
 
-  private async getExplicitSucursalIdsForUser(userId?: string | null): Promise<string[]> {
+  private normalizeRecipientIdentification(value: unknown): string {
+    return String(value ?? '')
+      .replace(/\D/g, '')
+      .slice(0, 13);
+  }
+
+  private assertRecipientIdentification(
+    esDestinatario: boolean,
+    identificacion: string | null,
+  ) {
+    if (!esDestinatario) return;
+    if (!identificacion || !/^(?:\d{10}|\d{13})$/.test(identificacion)) {
+      throw new BadRequestException(
+        'Para un usuario destinatario debes ingresar una cédula de 10 dígitos o un RUC de 13 dígitos.',
+      );
+    }
+  }
+
+  private async getExplicitSucursalIdsForUser(
+    userId?: string | null,
+  ): Promise<string[]> {
     if (!userId) return [];
     const rows = await this.userSucursalRepo.find({
       where: { userId, isDeleted: false },
@@ -98,10 +126,13 @@ export class UsersService {
       return { isSuperAdmin, allowedSucursalIds: null };
     }
 
-    const explicitSucursalIds = await this.getExplicitSucursalIdsForUser(requesterUserId);
+    const explicitSucursalIds =
+      await this.getExplicitSucursalIdsForUser(requesterUserId);
     return {
       isSuperAdmin: false,
-      allowedSucursalIds: explicitSucursalIds.length ? explicitSucursalIds : null,
+      allowedSucursalIds: explicitSucursalIds.length
+        ? explicitSucursalIds
+        : null,
     };
   }
 
@@ -110,12 +141,18 @@ export class UsersService {
     allowedSucursalIds: string[] | null,
   ) {
     if (!allowedSucursalIds?.length) return true;
-    const effectiveSucursalIds = [...new Set(
-      Array.isArray(user?.effectiveSucursales)
-        ? user.effectiveSucursales.map((item: any) => String(item?.id || '').trim()).filter(Boolean)
-        : [],
-    )];
-    return effectiveSucursalIds.some((item: any) => allowedSucursalIds.includes(item));
+    const effectiveSucursalIds = [
+      ...new Set(
+        Array.isArray(user?.effectiveSucursales)
+          ? user.effectiveSucursales
+              .map((item: any) => String(item?.id || '').trim())
+              .filter(Boolean)
+          : [],
+      ),
+    ];
+    return effectiveSucursalIds.some((item: any) =>
+      allowedSucursalIds.includes(item),
+    );
   }
 
   private async assertRequestedSucursalesWithinScope(
@@ -123,7 +160,10 @@ export class UsersService {
     requesterUserId?: string | null,
     requesterRoleId?: string | null,
   ) {
-    const scope = await this.getRequesterScope(requesterUserId, requesterRoleId);
+    const scope = await this.getRequesterScope(
+      requesterUserId,
+      requesterRoleId,
+    );
     if (scope.isSuperAdmin || !scope.allowedSucursalIds?.length) return;
 
     const normalized = this.normalizeSucursales(sucursales);
@@ -133,7 +173,9 @@ export class UsersService {
       );
     }
 
-    const invalid = normalized.filter((item) => !scope.allowedSucursalIds?.includes(item));
+    const invalid = normalized.filter(
+      (item) => !scope.allowedSucursalIds?.includes(item),
+    );
     if (invalid.length) {
       throw new BadRequestException(
         'Solo puedes asignar sucursales dentro de las sucursales habilitadas para tu usuario.',
@@ -153,7 +195,10 @@ export class UsersService {
     }));
   }
 
-  private async getVisibleRole(roleId: string, requesterRoleId?: string | null) {
+  private async getVisibleRole(
+    roleId: string,
+    requesterRoleId?: string | null,
+  ) {
     const role = await this.roleRepo.findOne({
       where: { id: roleId, isDeleted: false },
     });
@@ -175,7 +220,10 @@ export class UsersService {
     const [allSucursales, rows] = await Promise.all([
       this.getActiveSucursales(),
       this.userSucursalRepo.find({
-        where: { userId: In(users.map((item) => item.id)), isDeleted: false } as any,
+        where: {
+          userId: In(users.map((item) => item.id)),
+          isDeleted: false,
+        } as any,
       }),
     ]);
 
@@ -191,8 +239,8 @@ export class UsersService {
       const explicitIds = [...new Set(rowsByUser.get(user.id) ?? [])];
       const effectiveSucursales = explicitIds.length
         ? explicitIds
-          .map((item) => sucursalMap.get(item))
-          .filter((item): item is SucursalSummary => Boolean(item))
+            .map((item) => sucursalMap.get(item))
+            .filter((item): item is SucursalSummary => Boolean(item))
         : allSucursales;
 
       return {
@@ -215,8 +263,8 @@ export class UsersService {
     const normalized = this.normalizeSucursales(sucursales);
     const validSucursales = normalized.length
       ? await this.sucursalRepo.find({
-        where: { id: In(normalized), isDeleted: false } as any,
-      })
+          where: { id: In(normalized), isDeleted: false } as any,
+        })
       : [];
 
     if (normalized.length && validSucursales.length !== normalized.length) {
@@ -242,15 +290,17 @@ export class UsersService {
     if (!normalized.length) return;
 
     const freshRows = normalized.map((sucursalId) =>
-      this.userSucursalRepo.create(normalizeTimestampPayload(this.userSucursalRepo, {
-        userId,
-        sucursalId,
-        createdBy: userName,
-        updatedBy: userName,
-        isDeleted: false,
-        deletedAt: null,
-        deletedBy: null,
-      })),
+      this.userSucursalRepo.create(
+        normalizeTimestampPayload(this.userSucursalRepo, {
+          userId,
+          sucursalId,
+          createdBy: userName,
+          updatedBy: userName,
+          isDeleted: false,
+          deletedAt: null,
+          deletedBy: null,
+        }),
+      ),
     );
     await this.userSucursalRepo.save(freshRows);
   }
@@ -271,7 +321,10 @@ export class UsersService {
       : rows.filter((item) => !isSuperAdministratorRoleName(item.role?.nombre));
 
     const hydrated = await this.hydrateUsers(visibleRows);
-    const scope = await this.getRequesterScope(requesterUserId, requesterRoleId);
+    const scope = await this.getRequesterScope(
+      requesterUserId,
+      requesterRoleId,
+    );
 
     return hydrated.filter((item) =>
       this.userMatchesSucursalScope(item, scope.allowedSucursalIds),
@@ -295,7 +348,10 @@ export class UsersService {
       throw new NotFoundException('User no encontrado');
     }
     const [hydrated] = await this.hydrateUsers([user]);
-    const scope = await this.getRequesterScope(requesterUserId, requesterRoleId);
+    const scope = await this.getRequesterScope(
+      requesterUserId,
+      requesterRoleId,
+    );
     if (!this.userMatchesSucursalScope(hydrated, scope.allowedSucursalIds)) {
       throw new NotFoundException('User no encontrado');
     }
@@ -314,23 +370,36 @@ export class UsersService {
       requesterRoleId,
     );
     const hashed = await bcrypt.hash(dto.passUser, this.saltRounds);
+    const esDestinatario = dto.esDestinatario === true;
+    const identificacion = esDestinatario
+      ? this.normalizeRecipientIdentification(dto.identificacion)
+      : null;
+    this.assertRecipientIdentification(esDestinatario, identificacion);
 
-    const entity = this.userRepo.create(normalizeTimestampPayload(this.userRepo, {
-      ...dto,
-      passUser: hashed,
-      reportes:
-        dto.reportes !== undefined
-          ? this.normalizeReportes(dto.reportes)
-          : this.normalizeReportes(role.reportes),
-      tokenActive: null,
-      updatedBy: null,
-      isDeleted: false,
-      deletedAt: null,
-      deletedBy: null,
-    }));
+    const entity = this.userRepo.create(
+      normalizeTimestampPayload(this.userRepo, {
+        ...dto,
+        esDestinatario,
+        identificacion,
+        passUser: hashed,
+        reportes:
+          dto.reportes !== undefined
+            ? this.normalizeReportes(dto.reportes)
+            : this.normalizeReportes(role.reportes),
+        tokenActive: null,
+        updatedBy: null,
+        isDeleted: false,
+        deletedAt: null,
+        deletedBy: null,
+      }),
+    );
 
     const saved = await this.userRepo.save(entity);
-    await this.syncUserSucursales(saved.id, dto.sucursales, dto.createdBy ?? dto.nameUser);
+    await this.syncUserSucursales(
+      saved.id,
+      dto.sucursales,
+      dto.createdBy ?? dto.nameUser,
+    );
     return this.findOne(saved.id, requesterRoleId, requesterUserId);
   }
 
@@ -358,14 +427,34 @@ export class UsersService {
       dto.passUser = await bcrypt.hash(dto.passUser, this.saltRounds);
     }
 
-    const payload: Partial<TbUser> = { ...dto };
+    const nextEsDestinatario =
+      dto.esDestinatario !== undefined
+        ? dto.esDestinatario === true
+        : current.esDestinatario === true;
+    const nextIdentificacion = nextEsDestinatario
+      ? this.normalizeRecipientIdentification(
+          dto.identificacion !== undefined
+            ? dto.identificacion
+            : current.identificacion,
+        )
+      : null;
+    this.assertRecipientIdentification(nextEsDestinatario, nextIdentificacion);
+
+    const payload: Partial<TbUser> = {
+      ...dto,
+      esDestinatario: nextEsDestinatario,
+      identificacion: nextIdentificacion,
+    };
     delete (payload as any).sucursales;
 
     if (dto.reportes !== undefined) {
       payload.reportes = this.normalizeReportes(dto.reportes);
     }
 
-    await this.userRepo.update({ id }, normalizeTimestampPayload(this.userRepo, payload));
+    await this.userRepo.update(
+      { id },
+      normalizeTimestampPayload(this.userRepo, payload),
+    );
     await this.syncUserSucursales(
       id,
       dto.sucursales,
@@ -409,7 +498,10 @@ export class UsersService {
     requesterUserId?: string | null,
   ) {
     const all = await this.getActiveSucursales();
-    const scope = await this.getRequesterScope(requesterUserId, requesterRoleId);
+    const scope = await this.getRequesterScope(
+      requesterUserId,
+      requesterRoleId,
+    );
     if (!scope.allowedSucursalIds?.length) {
       return all;
     }
@@ -504,10 +596,10 @@ export class UsersService {
         allSucursales: Boolean(hydratedUser.allSucursales),
         role: user.role
           ? {
-            id: user.role.id,
-            nombre: user.role.nombre,
-            reportes: this.normalizeReportes(user.role.reportes),
-          }
+              id: user.role.id,
+              nombre: user.role.nombre,
+              reportes: this.normalizeReportes(user.role.reportes),
+            }
           : null,
       },
     };
