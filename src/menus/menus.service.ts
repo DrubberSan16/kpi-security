@@ -6,6 +6,7 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -18,14 +19,132 @@ import { UpdateMenuDto } from './dto/update-menu.dto';
 import { normalizeTimestampPayload } from '../common/utils/local-timestamp.util';
 import { isSuperAdministratorRoleName } from '../common/utils/role-visibility.util';
 
+interface DefaultMenuSeed {
+  nombre: string;
+  parentNombre: string;
+  urlComponent: string;
+  menuPosition: string;
+  icon: string;
+  descripcion?: string;
+}
+
 @Injectable()
-export class MenusService {
+export class MenusService implements OnModuleInit {
   private readonly logger = new Logger(MenusService.name);
+
+  private readonly defaultMenuSeeds: DefaultMenuSeed[] = [
+    {
+      nombre: 'Reservas de bodega',
+      parentNombre: 'Inventario',
+      urlComponent: 'reservas-bodega',
+      menuPosition: '10',
+      icon: 'mdi-clipboard-list-outline',
+      descripcion:
+        'Consulta de solo lectura de reservas de material por bodega y la orden de trabajo asociada.',
+    },
+  ];
 
   constructor(
     @InjectRepository(TbMenu)
     private readonly repo: Repository<TbMenu>,
   ) {}
+
+  async onModuleInit() {
+    try {
+      await this.ensureDefaultMenus();
+    } catch (error: any) {
+      this.logger.error(
+        `No se pudo asegurar el menu por defecto: ${error?.message ?? error}`,
+      );
+    }
+  }
+
+  async ensureDefaultMenus() {
+    const results: TbMenu[] = [];
+    for (const seed of this.defaultMenuSeeds) {
+      const row = await this.ensureMenuSeed(seed);
+      if (row) results.push(row);
+    }
+    return results;
+  }
+
+  private async ensureMenuSeed(seed: DefaultMenuSeed): Promise<TbMenu | null> {
+    const parent = await this.findMenuByNormalizedName(seed.parentNombre);
+    if (!parent || parent.isDeleted) {
+      this.logger.warn(
+        `No se encontro el menu padre activo "${seed.parentNombre}"; se omite el registro de "${seed.nombre}".`,
+      );
+      return null;
+    }
+
+    const existing = await this.findMenuByNormalizedName(seed.nombre);
+
+    if (existing && !existing.isDeleted) {
+      const needsUpdate =
+        existing.menuId !== parent.id ||
+        existing.urlComponent !== seed.urlComponent ||
+        existing.menuPosition !== seed.menuPosition ||
+        existing.status !== 'ACTIVE' ||
+        existing.icon !== seed.icon;
+      if (!needsUpdate) return existing;
+
+      existing.menuId = parent.id;
+      existing.urlComponent = seed.urlComponent;
+      existing.menuPosition = seed.menuPosition;
+      existing.status = 'ACTIVE';
+      existing.icon = seed.icon;
+      if (seed.descripcion) existing.descripcion = seed.descripcion;
+
+      try {
+        return await this.repo.save(existing);
+      } catch (error) {
+        this.handlePersistenceError('seed-update', error);
+      }
+    }
+
+    if (existing?.isDeleted) {
+      existing.nombre = seed.nombre;
+      existing.descripcion = seed.descripcion ?? existing.descripcion ?? null;
+      existing.menuId = parent.id;
+      existing.urlComponent = seed.urlComponent;
+      existing.menuPosition = seed.menuPosition;
+      existing.status = 'ACTIVE';
+      existing.icon = seed.icon;
+      existing.updatedBy = 'system-seed';
+      existing.isDeleted = false;
+      existing.deletedAt = null;
+      existing.deletedBy = null;
+
+      try {
+        return await this.repo.save(existing);
+      } catch (error) {
+        this.handlePersistenceError('seed-restore', error);
+      }
+    }
+
+    const entity = this.repo.create(
+      normalizeTimestampPayload(this.repo, {
+        nombre: seed.nombre,
+        descripcion: seed.descripcion ?? null,
+        menuId: parent.id,
+        urlComponent: seed.urlComponent,
+        menuPosition: seed.menuPosition,
+        status: 'ACTIVE',
+        icon: seed.icon,
+        createdBy: 'system-seed',
+        updatedBy: null,
+        isDeleted: false,
+        deletedAt: null,
+        deletedBy: null,
+      }),
+    );
+
+    try {
+      return await this.repo.save(entity);
+    } catch (error) {
+      this.handlePersistenceError('seed-create', error);
+    }
+  }
 
   private assertCanPurge(roleName?: string) {
     if (isSuperAdministratorRoleName(roleName)) return;
