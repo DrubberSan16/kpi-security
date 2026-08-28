@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -6,6 +6,11 @@ import { TbLogTransact } from '../database/entities/tb-log-transact.entity';
 import { CreateLogTransactDto } from './dto/create-log-transact.dto';
 import { UpdateLogTransactDto } from './dto/update-log-transact.dto';
 import { normalizeTimestampPayload } from '../common/utils/local-timestamp.util';
+import {
+  normalizeRequestMethod,
+  normalizeRequestUrl,
+  sanitizeRequestPayload,
+} from '../common/utils/request-payload.util';
 
 type FindAllFilters = {
   includeDeleted?: boolean;
@@ -17,11 +22,28 @@ type FindAllFilters = {
 };
 
 @Injectable()
-export class LogTransactsService {
+export class LogTransactsService implements OnModuleInit {
   constructor(
     @InjectRepository(TbLogTransact)
     private readonly repo: Repository<TbLogTransact>,
   ) {}
+
+  async onModuleInit() {
+    await this.ensureRequestContextSchema();
+  }
+
+  /**
+   * El log transaccional guardaba solo usuario, modulo, error y fecha. Estas
+   * columnas agregan el contexto de la solicitud que provoco el registro.
+   */
+  private async ensureRequestContextSchema() {
+    await this.repo.query(`
+      ALTER TABLE IF EXISTS kpi_security.tb_log_transact
+        ADD COLUMN IF NOT EXISTS request_method character varying(10),
+        ADD COLUMN IF NOT EXISTS request_url text,
+        ADD COLUMN IF NOT EXISTS request_payload jsonb;
+    `);
+  }
 
   async findAll(filters: FindAllFilters = {}) {
     const qb = this.repo.createQueryBuilder('l');
@@ -68,6 +90,10 @@ export class LogTransactsService {
       description: dto.description ?? null,
       status: dto.status,
 
+      requestMethod: normalizeRequestMethod(dto.requestMethod),
+      requestUrl: normalizeRequestUrl(dto.requestUrl),
+      requestPayload: sanitizeRequestPayload(dto.requestPayload),
+
       createdBy: dto.createdBy ?? null,
       updatedBy: null,
 
@@ -82,11 +108,22 @@ export class LogTransactsService {
   async update(id: string, dto: UpdateLogTransactDto) {
     await this.findOne(id);
 
+    const { requestPayload, ...rest } = dto;
     const patch: Partial<TbLogTransact> = {
-      ...dto,
+      ...rest,
       typeLog: dto.typeLog ?? undefined,
       description: dto.description ?? undefined,
     };
+
+    if (dto.requestMethod !== undefined) {
+      patch.requestMethod = normalizeRequestMethod(dto.requestMethod);
+    }
+    if (dto.requestUrl !== undefined) {
+      patch.requestUrl = normalizeRequestUrl(dto.requestUrl);
+    }
+    if (requestPayload !== undefined) {
+      patch.requestPayload = sanitizeRequestPayload(requestPayload);
+    }
 
     await this.repo.update({ id }, normalizeTimestampPayload(this.repo, patch));
     return this.findOne(id);

@@ -19,6 +19,20 @@ export class TbLogTransact {
   @Column({ type: 'text' })
   status: string;
 
+  @Column({
+    type: 'character varying',
+    length: 10,
+    name: 'request_method',
+    nullable: true,
+  })
+  requestMethod: string | null;
+
+  @Column({ type: 'text', name: 'request_url', nullable: true })
+  requestUrl: string | null;
+
+  @Column({ type: 'jsonb', name: 'request_payload', nullable: true })
+  requestPayload: Record<string, any> | null;
+
   @Column({ type: 'timestamp without time zone', name: 'created_at', default: () => 'now()' })
   createdAt: Date;
 
