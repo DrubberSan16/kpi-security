@@ -4,6 +4,7 @@ import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { LogTransactsService } from './log-transacts.service';
 import { CreateLogTransactDto } from './dto/create-log-transact.dto';
 import { UpdateLogTransactDto } from './dto/update-log-transact.dto';
+import { AllowInternalService } from '../auth/internal-service.decorator';
 
 @ApiTags('LogTransacts')
 @ApiBearerAuth('jwt')
@@ -42,6 +43,7 @@ export class LogTransactsController {
   }
 
   @Post()
+  @AllowInternalService()
   create(@Body() dto: CreateLogTransactDto) {
     return this.service.create(dto);
   }

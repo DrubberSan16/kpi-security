@@ -4,6 +4,7 @@ import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { MenuUsersService } from './menu-users.service';
 import { CreateMenuUserDto } from './dto/create-menu-user.dto';
 import { UpdateMenuUserDto } from './dto/update-menu-user.dto';
+import { AllowInternalService } from '../auth/internal-service.decorator';
 
 @ApiTags('MenuUsers')
 @ApiBearerAuth('jwt')
@@ -27,6 +28,7 @@ export class MenuUsersController {
   }
 
   @Get('tree/by-user/:userId')  
+  @AllowInternalService()
   async findTreeByUser(
     @Param('userId') userId: string    
   ) {
