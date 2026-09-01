@@ -42,6 +42,14 @@ export class MenusService implements OnModuleInit {
       descripcion:
         'Consulta de solo lectura de reservas de material por bodega y la orden de trabajo asociada.',
     },
+    {
+      nombre: 'Reporte detallado',
+      parentNombre: 'Administración',
+      urlComponent: 'reporte-detallado',
+      menuPosition: '99',
+      icon: 'mdi-chart-box-outline',
+      descripcion: 'Órdenes, consumo de aceite e inventario.',
+    },
   ];
 
   constructor(
@@ -77,17 +85,20 @@ export class MenusService implements OnModuleInit {
       return null;
     }
 
-    const existing = await this.findMenuByNormalizedName(seed.nombre);
+    const existing = await this.findMenuSeedCandidate(seed);
 
     if (existing && !existing.isDeleted) {
       const needsUpdate =
+        existing.nombre !== seed.nombre ||
         existing.menuId !== parent.id ||
         existing.urlComponent !== seed.urlComponent ||
         existing.menuPosition !== seed.menuPosition ||
         existing.status !== 'ACTIVE' ||
-        existing.icon !== seed.icon;
+        existing.icon !== seed.icon ||
+        existing.descripcion !== (seed.descripcion ?? null);
       if (!needsUpdate) return existing;
 
+      existing.nombre = seed.nombre;
       existing.menuId = parent.id;
       existing.urlComponent = seed.urlComponent;
       existing.menuPosition = seed.menuPosition;
@@ -209,6 +220,23 @@ export class MenusService implements OnModuleInit {
     }
 
     return qb
+      .orderBy('menu.isDeleted', 'ASC')
+      .addOrderBy('menu.updatedAt', 'DESC')
+      .addOrderBy('menu.createdAt', 'DESC')
+      .getOne();
+  }
+
+  private async findMenuSeedCandidate(seed: DefaultMenuSeed) {
+    return this.repo
+      .createQueryBuilder('menu')
+      .where(
+        `(LOWER(TRIM(menu.nombre)) = LOWER(TRIM(:nombre))
+          OR LOWER(TRIM(COALESCE(menu.urlComponent, ''))) = LOWER(TRIM(:urlComponent)))`,
+        {
+          nombre: seed.nombre,
+          urlComponent: seed.urlComponent,
+        },
+      )
       .orderBy('menu.isDeleted', 'ASC')
       .addOrderBy('menu.updatedAt', 'DESC')
       .addOrderBy('menu.createdAt', 'DESC')

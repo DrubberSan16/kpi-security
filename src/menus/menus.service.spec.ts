@@ -10,6 +10,25 @@ const createRepoMock = () => ({
 
 type RepoMock = ReturnType<typeof createRepoMock>;
 
+const reservasSeed = {
+  nombre: 'Reservas de bodega',
+  parentNombre: 'Inventario',
+  urlComponent: 'reservas-bodega',
+  menuPosition: '10',
+  icon: 'mdi-clipboard-list-outline',
+  descripcion:
+    'Consulta de solo lectura de reservas de material por bodega y la orden de trabajo asociada.',
+};
+
+const reporteDetalladoSeed = {
+  nombre: 'Reporte detallado',
+  parentNombre: 'Administración',
+  urlComponent: 'reporte-detallado',
+  menuPosition: '99',
+  icon: 'mdi-chart-box-outline',
+  descripcion: 'Órdenes, consumo de aceite e inventario.',
+};
+
 const buildQueryBuilderMock = (result: any) => ({
   where: jest.fn().mockReturnThis(),
   andWhere: jest.fn().mockReturnThis(),
@@ -34,7 +53,7 @@ describe('MenusService ensureDefaultMenus', () => {
       .mockReturnValueOnce(buildQueryBuilderMock(parent) as any)
       .mockReturnValueOnce(buildQueryBuilderMock(null) as any);
 
-    await service.ensureDefaultMenus();
+    await (service as any).ensureMenuSeed(reservasSeed);
 
     expect(repo.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -59,13 +78,15 @@ describe('MenusService ensureDefaultMenus', () => {
       menuPosition: '10',
       status: 'ACTIVE',
       icon: 'mdi-clipboard-list-outline',
+      descripcion:
+        'Consulta de solo lectura de reservas de material por bodega y la orden de trabajo asociada.',
       isDeleted: false,
     };
     repo.createQueryBuilder
       .mockReturnValueOnce(buildQueryBuilderMock(parent) as any)
       .mockReturnValueOnce(buildQueryBuilderMock(existing) as any);
 
-    await service.ensureDefaultMenus();
+    await (service as any).ensureMenuSeed(reservasSeed);
 
     expect(repo.create).not.toHaveBeenCalled();
     expect(repo.save).not.toHaveBeenCalled();
@@ -89,7 +110,7 @@ describe('MenusService ensureDefaultMenus', () => {
       .mockReturnValueOnce(buildQueryBuilderMock(parent) as any)
       .mockReturnValueOnce(buildQueryBuilderMock(existing) as any);
 
-    await service.ensureDefaultMenus();
+    await (service as any).ensureMenuSeed(reservasSeed);
 
     expect(existing.isDeleted).toBe(false);
     expect(existing.deletedAt).toBeNull();
@@ -117,7 +138,7 @@ describe('MenusService ensureDefaultMenus', () => {
       .mockReturnValueOnce(buildQueryBuilderMock(parent) as any)
       .mockReturnValueOnce(buildQueryBuilderMock(existing) as any);
 
-    await service.ensureDefaultMenus();
+    await (service as any).ensureMenuSeed(reservasSeed);
 
     expect(existing.menuId).toBe('inventario-id');
     expect(existing.urlComponent).toBe('reservas-bodega');
@@ -130,10 +151,72 @@ describe('MenusService ensureDefaultMenus', () => {
   it('omite la creacion cuando no existe un menu padre Inventario activo, sin lanzar error', async () => {
     repo.createQueryBuilder.mockReturnValueOnce(buildQueryBuilderMock(null) as any);
 
-    await expect(service.ensureDefaultMenus()).resolves.toEqual([]);
+    await expect(
+      (service as any).ensureMenuSeed(reservasSeed),
+    ).resolves.toBeNull();
 
     expect(repo.create).not.toHaveBeenCalled();
     expect(repo.save).not.toHaveBeenCalled();
+  });
+
+  it('incluye "Reporte detallado" bajo Administración entre los menus por defecto', async () => {
+    const inventory = {
+      id: 'inventario-id',
+      nombre: 'Inventario',
+      isDeleted: false,
+    };
+    const administration = {
+      id: 'administracion-id',
+      nombre: 'Administración',
+      isDeleted: false,
+    };
+    repo.createQueryBuilder
+      .mockReturnValueOnce(buildQueryBuilderMock(inventory) as any)
+      .mockReturnValueOnce(buildQueryBuilderMock(null) as any)
+      .mockReturnValueOnce(buildQueryBuilderMock(administration) as any)
+      .mockReturnValueOnce(buildQueryBuilderMock(null) as any);
+
+    await service.ensureDefaultMenus();
+
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nombre: 'Reporte detallado',
+        menuId: 'administracion-id',
+        urlComponent: 'reporte-detallado',
+        status: 'ACTIVE',
+      }),
+    );
+    expect(repo.save).toHaveBeenCalledTimes(2);
+  });
+
+  it('reutiliza la opcion con la misma ruta aunque tenga otro nombre', async () => {
+    const parent = {
+      id: 'administracion-id',
+      nombre: 'Administración',
+      isDeleted: false,
+    };
+    const existing: any = {
+      id: 'menu-reporte',
+      nombre: 'Informe gerencial',
+      descripcion: null,
+      menuId: 'administracion-id',
+      urlComponent: 'reporte-detallado',
+      menuPosition: '8',
+      status: 'ACTIVE',
+      icon: 'mdi-file-chart-outline',
+      isDeleted: false,
+    };
+    repo.createQueryBuilder
+      .mockReturnValueOnce(buildQueryBuilderMock(parent) as any)
+      .mockReturnValueOnce(buildQueryBuilderMock(existing) as any);
+
+    await (service as any).ensureMenuSeed(reporteDetalladoSeed);
+
+    expect(existing.nombre).toBe('Reporte detallado');
+    expect(existing.menuId).toBe('administracion-id');
+    expect(existing.urlComponent).toBe('reporte-detallado');
+    expect(repo.save).toHaveBeenCalledWith(existing);
+    expect(repo.create).not.toHaveBeenCalled();
   });
 
   it('no rompe el arranque del modulo cuando ensureDefaultMenus falla', async () => {
