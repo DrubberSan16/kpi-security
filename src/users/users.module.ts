@@ -10,6 +10,7 @@ import { TbUser } from '../database/entities/tb-user.entity';
 import { TbRole } from '../database/entities/tb-role.entity';
 import { TbUserSucursal } from '../database/entities/tb-user-sucursal.entity';
 import { InventorySucursal } from '../database/entities/inventory-sucursal.entity';
+import { WelcomeMailService } from '../common/mail/welcome-mail.service';
 
 function parseExpiresToSeconds(value?: string): number {
   if (!value) return 60 * 60 * 24; // 1d por defecto
@@ -58,7 +59,7 @@ function parseExpiresToSeconds(value?: string): number {
     }),
   ],
   controllers: [UsersController],
-  providers: [UsersService],
+  providers: [UsersService, WelcomeMailService],
   exports: [UsersService],
 })
 export class UsersModule {}

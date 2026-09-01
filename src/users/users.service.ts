@@ -16,6 +16,7 @@ import { TbRole } from '../database/entities/tb-role.entity';
 import { TbUserSucursal } from '../database/entities/tb-user-sucursal.entity';
 import { TbMenuUser } from '../database/entities/tb-menu-user.entity';
 import { InventorySucursal } from '../database/entities/inventory-sucursal.entity';
+import { WelcomeMailService } from '../common/mail/welcome-mail.service';
 
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -47,6 +48,7 @@ export class UsersService {
     private readonly sucursalRepo: Repository<InventorySucursal>,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+    private readonly welcomeMailService: WelcomeMailService,
   ) {}
 
   private get saltRounds(): number {
@@ -400,6 +402,16 @@ export class UsersService {
       dto.sucursales,
       dto.createdBy ?? dto.nameUser,
     );
+
+    // Bienvenida al correo registrado. No se envía la contraseña: la entrega el
+    // administrador. El envío nunca interrumpe el alta.
+    void this.welcomeMailService.sendWelcomeEmail({
+      email: saved.email,
+      nameUser: saved.nameUser,
+      displayName: saved.nameSurname ?? saved.nameUser,
+      roleName: role?.nombre ?? null,
+    });
+
     return this.findOne(saved.id, requesterRoleId, requesterUserId);
   }
 
