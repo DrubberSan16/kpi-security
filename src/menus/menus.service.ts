@@ -42,14 +42,6 @@ export class MenusService implements OnModuleInit {
       descripcion:
         'Consulta de solo lectura de reservas de material por bodega y la orden de trabajo asociada.',
     },
-    {
-      nombre: 'Reporte detallado',
-      parentNombre: 'Administración',
-      urlComponent: 'reporte-detallado',
-      menuPosition: '99',
-      icon: 'mdi-chart-box-outline',
-      descripcion: 'Órdenes, consumo de aceite e inventario.',
-    },
   ];
 
   constructor(

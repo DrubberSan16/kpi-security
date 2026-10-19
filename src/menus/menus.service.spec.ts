@@ -159,34 +159,13 @@ describe('MenusService ensureDefaultMenus', () => {
     expect(repo.save).not.toHaveBeenCalled();
   });
 
-  it('incluye "Reporte detallado" bajo Administración entre los menus por defecto', async () => {
-    const inventory = {
-      id: 'inventario-id',
-      nombre: 'Inventario',
-      isDeleted: false,
-    };
-    const administration = {
-      id: 'administracion-id',
-      nombre: 'Administración',
-      isDeleted: false,
-    };
-    repo.createQueryBuilder
-      .mockReturnValueOnce(buildQueryBuilderMock(inventory) as any)
-      .mockReturnValueOnce(buildQueryBuilderMock(null) as any)
-      .mockReturnValueOnce(buildQueryBuilderMock(administration) as any)
-      .mockReturnValueOnce(buildQueryBuilderMock(null) as any);
-
+  it('no vuelve a registrar los reportes retirados al iniciar el servicio', async () => {
+    const seed = jest.spyOn(service as any, 'ensureMenuSeed').mockResolvedValue(null);
     await service.ensureDefaultMenus();
-
-    expect(repo.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        nombre: 'Reporte detallado',
-        menuId: 'administracion-id',
-        urlComponent: 'reporte-detallado',
-        status: 'ACTIVE',
-      }),
-    );
-    expect(repo.save).toHaveBeenCalledTimes(2);
+    expect(seed).toHaveBeenCalledWith(reservasSeed);
+    for (const [item] of seed.mock.calls as any[]) {
+      expect(['dashboard-operativo', 'dashboard-supervisores', 'reporte-detallado']).not.toContain(item.urlComponent);
+    }
   });
 
   it('reutiliza la opcion con la misma ruta aunque tenga otro nombre', async () => {
