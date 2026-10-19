@@ -8,7 +8,8 @@ import { MenuRolesModule } from './menu-roles/menu-roles.module';
 import { MenuUsersModule } from './menu-users/menu-users.module';
 import { LogTransactsModule } from './log-transacts/log-transacts.module';
 import { ENTITIES } from './database/entities';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { RestrictedModuleInterceptor } from './common/restricted-module.interceptor';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { AuthModule } from './auth/auth.module';
 
@@ -59,6 +60,7 @@ import { AuthModule } from './auth/auth.module';
     AuthModule,
   ],
   providers: [
+    { provide: APP_INTERCEPTOR, useClass: RestrictedModuleInterceptor },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

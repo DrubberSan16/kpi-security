@@ -3,6 +3,7 @@ const SUPER_ADMIN_ROLE_NAMES = new Set([
   'SUPERADMINISTRADOR',
   'SUPER_ADMINISTRADOR',
   'SUPER ADMIN',
+  'SUPER_ADMIN',
 ]);
 
 export function normalizeRoleName(value: unknown): string {
